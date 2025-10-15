@@ -7,8 +7,50 @@ import "./dashboard.css"
 
 const API_BASE_URL = "https://api-rac-n-play.vercel.app/api/data"
 
+interface CheckinPerDay {
+  date: string
+  count: number
+}
+
+interface CheckinPerActivation {
+  name: string
+  count: number
+}
+
+interface UserPerDay {
+  date: string
+  count: number
+}
+
+interface AgeDistribution {
+  age: string
+  count: number
+}
+
+interface ClientIntention {
+  type: string
+  count: number
+}
+
+interface ActivationByTime {
+  time: string
+  count: number
+}
+
+interface DashboardData {
+  totalUsers: number
+  totalCheckins: number
+  checkinsPerDay: CheckinPerDay[]
+  checkinsPerActivation: CheckinPerActivation[]
+  usersPerDay: UserPerDay[]
+  ageDistribution: AgeDistribution[]
+  clientIntention: ClientIntention[]
+  averageSurveyRating: string
+  activationsByTime: ActivationByTime[]
+}
+
 // Utility functions
-const processCheckinsPerDay = (checkins: any[]) => {
+const processCheckinsPerDay = (checkins: any[]): CheckinPerDay[] => {
   const checkinsPerDay: Record<string, number> = {}
 
   checkins.forEach((checkin) => {
@@ -21,7 +63,11 @@ const processCheckinsPerDay = (checkins: any[]) => {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 }
 
-const processCheckinsPerActivation = (checkins: any[], activations: any[], checkinActivationLinks: any[]) => {
+const processCheckinsPerActivation = (
+  checkins: any[],
+  activations: any[],
+  checkinActivationLinks: any[],
+): CheckinPerActivation[] => {
   const activationMap: Record<number, { name: string; count: number }> = {}
 
   activations.forEach((activation) => {
@@ -43,7 +89,7 @@ const processCheckinsPerActivation = (checkins: any[], activations: any[], check
     .sort((a, b) => b.count - a.count)
 }
 
-const processUsersPerDay = (users: any[]) => {
+const processUsersPerDay = (users: any[]): UserPerDay[] => {
   const usersPerDay: Record<string, number> = {}
 
   users.forEach((user) => {
@@ -56,7 +102,7 @@ const processUsersPerDay = (users: any[]) => {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 }
 
-const processAgeDistribution = (surveys: any[]) => {
+const processAgeDistribution = (surveys: any[]): AgeDistribution[] => {
   const ageGroups: Record<string, number> = {}
 
   surveys.forEach((survey) => {
@@ -74,7 +120,7 @@ const processAgeDistribution = (surveys: any[]) => {
   }))
 }
 
-const processClientIntention = (surveys: any[]) => {
+const processClientIntention = (surveys: any[]): ClientIntention[] => {
   const intentions: Record<string, number> = {
     Cliente: 0,
     "Não Cliente": 0,
@@ -96,8 +142,8 @@ const processClientIntention = (surveys: any[]) => {
   }))
 }
 
-const calculateAverageSurveyRating = (surveys: any[]) => {
-  if (surveys.length === 0) return 0
+const calculateAverageSurveyRating = (surveys: any[]): string => {
+  if (surveys.length === 0) return "0"
 
   let totalRating = 0
   let ratingCount = 0
@@ -119,12 +165,12 @@ const calculateAverageSurveyRating = (surveys: any[]) => {
   return ratingCount > 0 ? (totalRating / ratingCount).toFixed(2) : "0"
 }
 
-const getUniqueUsersWithActivations = (checkinUserLinks: any[]) => {
+const getUniqueUsersWithActivations = (checkinUserLinks: any[]): number => {
   const uniqueUsers = new Set(checkinUserLinks.map((link) => link.user_id))
   return uniqueUsers.size
 }
 
-const processActivationsByTime = (checkins: any[]) => {
+const processActivationsByTime = (checkins: any[]): ActivationByTime[] => {
   const timeSlots: Record<string, number> = {}
 
   checkins.forEach((checkin) => {
@@ -266,7 +312,7 @@ const BarChartComponent = ({
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [dashboardData, setDashboardData] = useState({
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalUsers: 0,
     totalCheckins: 0,
     checkinsPerDay: [],
@@ -299,7 +345,7 @@ export default function Dashboard() {
         const checkinUserLinks = data.tables?.checkins_users_permissions_user_lnk?.data || []
 
         // Process data for dashboard
-        const processedData = {
+        const processedData: DashboardData = {
           totalUsers: getUniqueUsersWithActivations(checkinUserLinks),
           totalCheckins: checkins.length,
           checkinsPerDay: processCheckinsPerDay(checkins),
