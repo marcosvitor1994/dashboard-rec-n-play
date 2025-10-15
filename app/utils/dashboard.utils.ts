@@ -270,4 +270,5 @@ export const processSurveyQuestions = (surveys: any[]): SurveyQuestion[] => {
       totalRespostas: count,
     }))
     .filter((item) => item.totalRespostas > 0)
+    .filter((item) => !item.pergunta.toLowerCase().includes("idade"))
 }

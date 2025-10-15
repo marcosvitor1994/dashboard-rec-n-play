@@ -23,7 +23,7 @@ export default function SurveyQuestionsSection({ questions }: SurveyQuestionsSec
           marginBottom: "1rem",
         }}
       >
-        Análise de Perguntas da Pesquisa de Experiências
+        Análise da Pesquisa de Satisfação
       </h2>
       <div style={{ padding: "1rem" }}>
         {questions.length > 0 ? (

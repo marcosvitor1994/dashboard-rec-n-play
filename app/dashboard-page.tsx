@@ -77,7 +77,7 @@ export default function Dashboard() {
         const checkins = getPublishedData(data.tables?.checkins?.data || [])
         const activations = getPublishedData(data.tables?.ativacoes?.data || [])
         const surveys = getPublishedData(data.tables?.pesquisa_experiencias?.data || [])
-        const resgates = getPublishedData(data.tables?.resgates?.data || [])
+        const resgatesBrindeLinks = data.tables?.resgates_brinde_lnk?.data || []
         const checkinActivationLinks = data.tables?.checkins_ativacao_lnk?.data || []
         const checkinUserLinks = data.tables?.checkins_users_permissions_user_lnk?.data || []
         const avaliacaoAtivacoes = getPublishedData(data.tables?.avaliacao_de_ativacaos?.data || [])
@@ -92,7 +92,7 @@ export default function Dashboard() {
         const processedData: DashboardData = {
           totalUsers: getUniqueUsersWithActivations(checkinUserLinks),
           totalCheckins: checkins.length,
-          totalResgates: resgates.length,
+          totalResgates: resgatesBrindeLinks.length,
           checkinsPerDay: processCheckinsPerDay(checkins),
           checkinsPerActivation: processCheckinsPerActivation(checkins, activations, checkinActivationLinks, avaliacaoAtivacoes, avaliacaoAtivacaoLinks),
           usersPerDay: processUsersPerDay(users),
@@ -303,7 +303,7 @@ export default function Dashboard() {
                 {data.avgRating !== undefined && (
                   <>
                     <div style={{ fontSize: "0.875rem", color: "#4a5568", marginBottom: "4px" }}>
-                      Avaliação Média: <strong>{data.avgRating}</strong>/10
+                      Avaliação Média: <strong>{data.avgRating}</strong>/5
                     </div>
                     <div style={{ fontSize: "0.875rem", color: "#718096" }}>
                       Total de Avaliações: {data.totalRatings}
