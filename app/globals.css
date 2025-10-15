@@ -122,3 +122,36 @@
     @apply bg-background text-foreground;
   }
 }
+
+:root {
+  /* Define as variáveis das fontes para uso em todo o projeto */
+  --font-banco-titulos: '__font-banco-titulos', Arial, sans-serif;
+  --font-banco-textos: '__font-banco-textos', Arial, sans-serif;
+
+  /* Cores e outras variáveis globais podem ser adicionadas aqui */
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  /* Aplica a fonte de TEXTOS como padrão para todo o site */
+  font-family: var(--font-banco-textos);
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Aplica a fonte de TÍTULOS para todas as tags de cabeçalho */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-banco-titulos);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
