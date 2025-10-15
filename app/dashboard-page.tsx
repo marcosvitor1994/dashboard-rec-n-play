@@ -5,7 +5,7 @@ import { ResponsiveLine } from "@nivo/line"
 import { ResponsiveBar } from "@nivo/bar"
 import "./dashboard.css"
 
-const API_BASE_URL = "https://api-rac-n-play.vercel.app/api/data"
+const API_BASE_URL = "https://api-rac-n-play.vercel.app/api/data/all"
 
 interface CheckinPerDay {
   date: string
@@ -37,9 +37,28 @@ interface ActivationByTime {
   count: number
 }
 
+interface SurveyQuestion {
+  pergunta: string
+  media: number
+  totalRespostas: number
+}
+
+interface Activation {
+  id: number
+  nome: string
+}
+
+interface AvaliacaoAtivacao {
+  id: number
+  nota: number
+  ativacao_id: number
+  created_at: string
+}
+
 interface DashboardData {
   totalUsers: number
   totalCheckins: number
+  totalResgates: number
   checkinsPerDay: CheckinPerDay[]
   checkinsPerActivation: CheckinPerActivation[]
   usersPerDay: UserPerDay[]
@@ -47,6 +66,9 @@ interface DashboardData {
   clientIntention: ClientIntention[]
   averageSurveyRating: string
   activationsByTime: ActivationByTime[]
+  surveyQuestions: SurveyQuestion[]
+  activations: Activation[]
+  avaliacoes: AvaliacaoAtivacao[]
 }
 
 // Utility functions
@@ -188,6 +210,102 @@ const getPublishedData = (dataArray: any[]) => {
   return dataArray.filter((item) => item.published_at !== null)
 }
 
+const processSurveyQuestions = (surveys: any[]): SurveyQuestion[] => {
+  const questionsMap: Record<string, { total: number; count: number }> = {}
+
+  surveys.forEach((survey) => {
+    if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
+      survey.pergunta_resposta.forEach((item: any) => {
+        if (item.pergunta && item.resposta) {
+          const pergunta = item.pergunta
+          const resposta = item.resposta
+
+          // Tenta extrair número da resposta
+          const match = resposta.match(/^(\d+)/)
+          if (match) {
+            const valor = parseInt(match[1])
+            if (!questionsMap[pergunta]) {
+              questionsMap[pergunta] = { total: 0, count: 0 }
+            }
+            questionsMap[pergunta].total += valor
+            questionsMap[pergunta].count += 1
+          }
+        }
+      })
+    }
+  })
+
+  return Object.entries(questionsMap)
+    .map(([pergunta, { total, count }]) => ({
+      pergunta,
+      media: count > 0 ? Number((total / count).toFixed(2)) : 0,
+      totalRespostas: count,
+    }))
+    .filter((item) => item.totalRespostas > 0)
+}
+
+const calculateAverageRatingByActivation = (
+  avaliacoes: any[],
+  avaliacaoAtivacaoLinks: any[],
+  activationId?: number,
+): string => {
+  let relevantAvaliacoes = avaliacoes
+
+  if (activationId) {
+    const avaliacaoIds = avaliacaoAtivacaoLinks
+      .filter((link) => link.ativacao_id === activationId)
+      .map((link) => link.avaliacao_de_ativacao_id)
+
+    relevantAvaliacoes = avaliacoes.filter((av) => avaliacaoIds.includes(av.id))
+  }
+
+  if (relevantAvaliacoes.length === 0) return "0"
+
+  const total = relevantAvaliacoes.reduce((sum, av) => sum + (av.nota || 0), 0)
+  return (total / relevantAvaliacoes.length).toFixed(2)
+}
+
+const processActivationsByTimeWithFilters = (
+  checkins: any[],
+  checkinActivationLinks: any[],
+  activationId?: number,
+  startDate?: Date,
+  endDate?: Date,
+): ActivationByTime[] => {
+  let filteredCheckins = checkins
+
+  // Filtrar por ativação
+  if (activationId) {
+    const checkinIds = checkinActivationLinks
+      .filter((link) => link.ativacao_id === activationId)
+      .map((link) => link.checkin_id)
+
+    filteredCheckins = filteredCheckins.filter((checkin) => checkinIds.includes(checkin.id))
+  }
+
+  // Filtrar por data
+  if (startDate || endDate) {
+    filteredCheckins = filteredCheckins.filter((checkin) => {
+      const checkinDate = new Date(checkin.created_at)
+      if (startDate && checkinDate < startDate) return false
+      if (endDate && checkinDate > endDate) return false
+      return true
+    })
+  }
+
+  const timeSlots: Record<string, number> = {}
+
+  filteredCheckins.forEach((checkin) => {
+    const hour = new Date(checkin.created_at).getHours()
+    const timeSlot = `${hour}:00`
+    timeSlots[timeSlot] = (timeSlots[timeSlot] || 0) + 1
+  })
+
+  return Object.entries(timeSlots)
+    .map(([time, count]) => ({ time, count }))
+    .sort((a, b) => parseInt(a.time) - parseInt(b.time))
+}
+
 // Components
 const MetricCard = ({
   label,
@@ -315,6 +433,7 @@ export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalUsers: 0,
     totalCheckins: 0,
+    totalResgates: 0,
     checkinsPerDay: [],
     checkinsPerActivation: [],
     usersPerDay: [],
@@ -322,13 +441,26 @@ export default function Dashboard() {
     clientIntention: [],
     averageSurveyRating: "0",
     activationsByTime: [],
+    surveyQuestions: [],
+    activations: [],
+    avaliacoes: [],
   })
+
+  // Filtros
+  const [selectedActivation, setSelectedActivation] = useState<number | undefined>(undefined)
+  const [startDate, setStartDate] = useState<string>("")
+  const [endDate, setEndDate] = useState<string>("")
+  const [filteredActivationsByTime, setFilteredActivationsByTime] = useState<ActivationByTime[]>([])
+  const [filteredAverageRating, setFilteredAverageRating] = useState<string>("0")
+
+  // Raw data para filtros
+  const [rawData, setRawData] = useState<any>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`${API_BASE_URL}/all`)
+        const response = await fetch(API_BASE_URL)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -339,15 +471,27 @@ export default function Dashboard() {
         const checkins = getPublishedData(data.tables?.checkins?.data || [])
         const activations = getPublishedData(data.tables?.ativacoes?.data || [])
         const surveys = getPublishedData(data.tables?.pesquisa_experiencias?.data || [])
+        const resgates = getPublishedData(data.tables?.resgates?.data || [])
+        const avaliacoes = getPublishedData(data.tables?.avaliacao_de_ativacaos?.data || [])
 
         // Get relationship links
         const checkinActivationLinks = data.tables?.checkins_ativacao_lnk?.data || []
         const checkinUserLinks = data.tables?.checkins_users_permissions_user_lnk?.data || []
+        const avaliacaoAtivacaoLinks = data.tables?.avaliacao_de_ativacaos_ativacao_lnk?.data || []
+
+        // Salvar dados brutos para filtros
+        setRawData({
+          checkins,
+          checkinActivationLinks,
+          avaliacoes,
+          avaliacaoAtivacaoLinks,
+        })
 
         // Process data for dashboard
         const processedData: DashboardData = {
           totalUsers: getUniqueUsersWithActivations(checkinUserLinks),
           totalCheckins: checkins.length,
+          totalResgates: resgates.length,
           checkinsPerDay: processCheckinsPerDay(checkins),
           checkinsPerActivation: processCheckinsPerActivation(checkins, activations, checkinActivationLinks),
           usersPerDay: processUsersPerDay(users),
@@ -355,9 +499,19 @@ export default function Dashboard() {
           clientIntention: processClientIntention(surveys),
           averageSurveyRating: calculateAverageSurveyRating(surveys),
           activationsByTime: processActivationsByTime(checkins),
+          surveyQuestions: processSurveyQuestions(surveys),
+          activations: activations.map((a: any) => ({ id: a.id, nome: a.nome })),
+          avaliacoes: avaliacoes.map((a: any) => ({
+            id: a.id,
+            nota: a.nota,
+            ativacao_id: 0,
+            created_at: a.created_at,
+          })),
         }
 
         setDashboardData(processedData)
+        setFilteredActivationsByTime(processedData.activationsByTime)
+        setFilteredAverageRating(processedData.averageSurveyRating)
         setError(null)
       } catch (err) {
         setError("Erro ao carregar dados do dashboard. Por favor, tente novamente.")
@@ -369,6 +523,32 @@ export default function Dashboard() {
 
     fetchData()
   }, [])
+
+  // Aplicar filtros quando mudarem
+  useEffect(() => {
+    if (!rawData) return
+
+    const start = startDate ? new Date(startDate) : undefined
+    const end = endDate ? new Date(endDate) : undefined
+
+    // Atualizar gráfico de ativações por horário
+    const filtered = processActivationsByTimeWithFilters(
+      rawData.checkins,
+      rawData.checkinActivationLinks,
+      selectedActivation,
+      start,
+      end,
+    )
+    setFilteredActivationsByTime(filtered)
+
+    // Atualizar média de avaliações
+    const avgRating = calculateAverageRatingByActivation(
+      rawData.avaliacoes,
+      rawData.avaliacaoAtivacaoLinks,
+      selectedActivation,
+    )
+    setFilteredAverageRating(avgRating)
+  }, [selectedActivation, startDate, endDate, rawData])
 
   if (loading) {
     return (
@@ -401,6 +581,7 @@ export default function Dashboard() {
       <div className="metrics-grid">
         <MetricCard label="Usuários com Ativações" value={dashboardData.totalUsers} />
         <MetricCard label="Total de Check-ins" value={dashboardData.totalCheckins} />
+        <MetricCard label="Total de Resgates" value={dashboardData.totalResgates} />
         <MetricCard label="Ativações Disponíveis" value={dashboardData.checkinsPerActivation.length} />
         <MetricCard
           label="Nota Média das Pesquisas"
@@ -408,6 +589,84 @@ export default function Dashboard() {
           className="survey-rating-card"
         />
       </div>
+
+      {/* Filtros */}
+      <div className="filters-section" style={{ marginBottom: "2rem", padding: "1.5rem", background: "#fff", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
+        <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem", fontWeight: 600 }}>Filtros</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
+          <div>
+            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
+              Ativação
+            </label>
+            <select
+              value={selectedActivation || ""}
+              onChange={(e) => setSelectedActivation(e.target.value ? Number(e.target.value) : undefined)}
+              style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid #ddd" }}
+            >
+              <option value="">Todas as ativações</option>
+              {dashboardData.activations.map((activation) => (
+                <option key={activation.id} value={activation.id}>
+                  {activation.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
+              Data Início
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid #ddd" }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
+              Data Fim
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid #ddd" }}
+            />
+          </div>
+        </div>
+        {(selectedActivation || startDate || endDate) && (
+          <div style={{ marginTop: "1rem" }}>
+            <button
+              onClick={() => {
+                setSelectedActivation(undefined)
+                setStartDate("")
+                setEndDate("")
+              }}
+              style={{
+                padding: "0.5rem 1rem",
+                background: "#f44336",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+              }}
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Card de Média de Avaliações Filtrada */}
+      {selectedActivation && (
+        <div style={{ marginBottom: "2rem", padding: "1.5rem", background: "#fff", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
+          <h3 style={{ marginBottom: "0.5rem", fontSize: "1.2rem", fontWeight: 600 }}>
+            Média de Avaliações - {dashboardData.activations.find((a) => a.id === selectedActivation)?.nome}
+          </h3>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "#1976d2" }}>{filteredAverageRating}</div>
+        </div>
+      )}
 
       {/* Charts Grid */}
       <div className="charts-grid">
@@ -429,14 +688,6 @@ export default function Dashboard() {
               keys={["count"]}
               colors={{ scheme: "set2" }}
             />
-          </div>
-        </div>
-
-        {/* Users per Day */}
-        <div className="chart-card full-width-chart">
-          <h2 className="chart-title">Usuários Cadastrados por Dia</h2>
-          <div className="chart-container">
-            <LineChartComponent data={dashboardData.usersPerDay} xKey="date" yKey="count" />
           </div>
         </div>
 
@@ -466,16 +717,69 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Users per Day */}
+        <div className="chart-card full-width-chart">
+          <h2 className="chart-title">Usuários Cadastrados por Dia</h2>
+          <div className="chart-container">
+            <LineChartComponent data={dashboardData.usersPerDay} xKey="date" yKey="count" />
+          </div>
+        </div>        
+
         {/* Activations by Time */}
         <div className="chart-card full-width-chart">
-          <h2 className="chart-title">Picos de Horário das Ativações</h2>
+          <h2 className="chart-title">
+            Picos de Horário das Ativações
+            {selectedActivation && ` - ${dashboardData.activations.find((a) => a.id === selectedActivation)?.nome}`}
+            {(startDate || endDate) && " (Filtrado)"}
+          </h2>
           <div className="chart-container">
             <BarChartComponent
-              data={dashboardData.activationsByTime}
+              data={filteredActivationsByTime}
               indexBy="time"
               keys={["count"]}
               colors={{ scheme: "category10" }}
             />
+          </div>
+        </div>
+
+        {/* Survey Questions Analysis */}
+        <div className="chart-card full-width-chart">
+          <h2 className="chart-title">Análise de Perguntas da Pesquisa de Experiências</h2>
+          <div style={{ padding: "1rem" }}>
+            {dashboardData.surveyQuestions.length > 0 ? (
+              <div style={{ display: "grid", gap: "1rem" }}>
+                {dashboardData.surveyQuestions.map((question, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: "1rem",
+                      background: "#f5f5f5",
+                      borderRadius: "8px",
+                      borderLeft: "4px solid #1976d2",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: "0.5rem", color: "#333" }}>
+                      {question.pergunta}
+                    </div>
+                    <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
+                      <div>
+                        <span style={{ fontSize: "0.9rem", color: "#666" }}>Média: </span>
+                        <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "#1976d2" }}>
+                          {question.media.toFixed(2)}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.9rem", color: "#666" }}>
+                        Total de respostas: {question.totalRespostas}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "2rem", color: "#666" }}>
+                Nenhuma pergunta com respostas numéricas encontrada
+              </div>
+            )}
           </div>
         </div>
       </div>
