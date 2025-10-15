@@ -1,426 +1,33 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ResponsiveLine } from "@nivo/line"
-import { ResponsiveBar } from "@nivo/bar"
+import type {
+  DashboardData,
+  CheckinPerDay,
+  AgeDistribution,
+  ClientIntention,
+  ActivationByTime,
+} from "./types/dashboard.types"
+import {
+  processCheckinsPerDay,
+  processCheckinsPerActivation,
+  processUsersPerDay,
+  processAgeDistribution,
+  processClientIntention,
+  calculateAverageSurveyRating,
+  processActivationsByTimeWithFilters,
+  processSurveyQuestions,
+  getAvailableDates,
+  getPublishedData,
+  getUniqueUsersWithActivations,
+} from "./utils/dashboard.utils"
+import MetricCard from "./components/dashboard/MetricCard"
+import LineChartComponent from "./components/dashboard/LineChartComponent"
+import BarChartComponent from "./components/dashboard/BarChartComponent"
+import DashboardFilters from "./components/dashboard/DashboardFilters"
+import SurveyQuestionsSection from "./components/dashboard/SurveyQuestionsSection"
 
 const API_BASE_URL = "https://api-rac-n-play.vercel.app/api/data/all"
-
-interface CheckinPerDay {
-  date: string
-  count: number
-}
-
-interface CheckinPerActivation {
-  name: string
-  count: number
-}
-
-interface UserPerDay {
-  date: string
-  count: number
-}
-
-interface AgeDistribution {
-  age: string
-  count: number
-}
-
-interface ClientIntention {
-  type: string
-  count: number
-}
-
-interface ActivationByTime {
-  time: string
-  count: number
-}
-
-interface SurveyQuestion {
-  pergunta: string
-  media: number
-  totalRespostas: number
-}
-
-interface Activation {
-  id: number
-  nome: string
-}
-
-interface DashboardData {
-  totalUsers: number
-  totalCheckins: number
-  totalResgates: number
-  checkinsPerDay: CheckinPerDay[]
-  checkinsPerActivation: CheckinPerActivation[]
-  usersPerDay: UserPerDay[]
-  ageDistribution: AgeDistribution[]
-  clientIntention: ClientIntention[]
-  averageSurveyRating: string
-  activationsByTime: ActivationByTime[]
-  surveyQuestions: SurveyQuestion[]
-  activations: Activation[]
-  availableDates: string[]
-}
-
-const processCheckinsPerDay = (checkins: any[], activationId?: number, checkinActivationLinks?: any[]): CheckinPerDay[] => {
-  let filteredCheckins = checkins
-  
-  if (activationId && checkinActivationLinks) {
-    const checkinIds = checkinActivationLinks
-      .filter((link) => link.ativacao_id === activationId)
-      .map((link) => link.checkin_id)
-    filteredCheckins = checkins.filter((checkin) => checkinIds.includes(checkin.id))
-  }
-
-  const checkinsPerDay: Record<string, number> = {}
-  filteredCheckins.forEach((checkin) => {
-    const date = new Date(checkin.created_at).toLocaleDateString("pt-BR")
-    checkinsPerDay[date] = (checkinsPerDay[date] || 0) + 1
-  })
-
-  return Object.entries(checkinsPerDay)
-    .map(([date, count]) => ({ date, count }))
-    .sort((a, b) => new Date(a.date.split('/').reverse().join('-')).getTime() - new Date(b.date.split('/').reverse().join('-')).getTime())
-}
-
-const processCheckinsPerActivation = (
-  checkins: any[],
-  activations: any[],
-  checkinActivationLinks: any[],
-): CheckinPerActivation[] => {
-  const activationMap: Record<number, { name: string; count: number }> = {}
-
-  activations.forEach((activation) => {
-    activationMap[activation.id] = {
-      name: activation.nome,
-      count: 0,
-    }
-  })
-
-  checkinActivationLinks.forEach((link) => {
-    const activation = activationMap[link.ativacao_id]
-    if (activation) {
-      activation.count += 1
-    }
-  })
-
-  return Object.values(activationMap)
-    .filter((item) => item.count > 0)
-    .sort((a, b) => b.count - a.count)
-}
-
-const processAgeDistribution = (surveys: any[], activationId?: number, checkinActivationLinks?: any[]): AgeDistribution[] => {
-  let filteredSurveys = surveys
-  
-  if (activationId && checkinActivationLinks) {
-    const checkinIds = checkinActivationLinks
-      .filter((link) => link.ativacao_id === activationId)
-      .map((link) => link.checkin_id)
-    filteredSurveys = surveys.filter((survey) => checkinIds.includes(survey.checkin_id))
-  }
-
-  const ageGroups: Record<string, number> = {}
-
-  filteredSurveys.forEach((survey) => {
-    const ageQuestion = survey.pergunta_resposta?.find((item: any) => item.pergunta?.includes("idade"))
-
-    if (ageQuestion?.resposta) {
-      const age = ageQuestion.resposta
-      ageGroups[age] = (ageGroups[age] || 0) + 1
-    }
-  })
-
-  return Object.entries(ageGroups).map(([age, count]) => ({
-    age,
-    count,
-  }))
-}
-
-const processClientIntention = (surveys: any[], activationId?: number, checkinActivationLinks?: any[]): ClientIntention[] => {
-  let filteredSurveys = surveys
-  
-  if (activationId && checkinActivationLinks) {
-    const checkinIds = checkinActivationLinks
-      .filter((link) => link.ativacao_id === activationId)
-      .map((link) => link.checkin_id)
-    filteredSurveys = surveys.filter((survey) => checkinIds.includes(survey.checkin_id))
-  }
-
-  const intentionCounts: Record<string, number> = {}
-  
-  filteredSurveys.forEach((survey) => {
-    const intentionQuestion = survey.pergunta_resposta?.find((item: any) => 
-      item.pergunta?.toLowerCase().includes("intenção") || 
-      item.pergunta?.toLowerCase().includes("intencao") ||
-      item.pergunta?.toLowerCase().includes("relacionamento")
-    )
-
-    if (intentionQuestion?.resposta) {
-      const response = intentionQuestion.resposta
-      const match = response.match(/^(\d+)/)
-      if (match) {
-        const value = parseInt(match[1])
-        if (value >= 4) {
-          intentionCounts["Top 2 Box (Positivo)"] = (intentionCounts["Top 2 Box (Positivo)"] || 0) + 1
-        } else {
-          intentionCounts["Outros"] = (intentionCounts["Outros"] || 0) + 1
-        }
-      }
-    }
-  })
-
-  return Object.entries(intentionCounts).map(([type, count]) => ({
-    type,
-    count,
-  }))
-}
-
-const processActivationsByTimeWithFilters = (
-  checkins: any[],
-  checkinActivationLinks: any[],
-  activationId?: number,
-  selectedDate?: string,
-): ActivationByTime[] => {
-  let filteredCheckins = checkins
-
-  if (activationId) {
-    const checkinIds = checkinActivationLinks
-      .filter((link) => link.ativacao_id === activationId)
-      .map((link) => link.checkin_id)
-    filteredCheckins = filteredCheckins.filter((checkin) => checkinIds.includes(checkin.id))
-  }
-
-  if (selectedDate) {
-    filteredCheckins = filteredCheckins.filter((checkin) => {
-      const checkinDate = new Date(checkin.created_at).toLocaleDateString("pt-BR")
-      return checkinDate === selectedDate
-    })
-  }
-
-  const timeSlots: Record<string, number> = {}
-
-  filteredCheckins.forEach((checkin) => {
-    const hour = new Date(checkin.created_at).getHours()
-    const timeSlot = `${hour.toString().padStart(2, '0')}:00`
-    timeSlots[timeSlot] = (timeSlots[timeSlot] || 0) + 1
-  })
-
-  return Object.entries(timeSlots)
-    .map(([time, count]) => ({ time, count }))
-    .sort((a, b) => parseInt(a.time) - parseInt(b.time))
-}
-
-const getAvailableDates = (checkins: any[]): string[] => {
-  const dates = new Set<string>()
-  checkins.forEach((checkin) => {
-    const date = new Date(checkin.created_at).toLocaleDateString("pt-BR")
-    dates.add(date)
-  })
-  return Array.from(dates).sort((a, b) => 
-    new Date(a.split('/').reverse().join('-')).getTime() - 
-    new Date(b.split('/').reverse().join('-')).getTime()
-  )
-}
-
-const getPublishedData = (dataArray: any[]) => {
-  return dataArray.filter((item) => item.published_at !== null)
-}
-
-const getUniqueUsersWithActivations = (checkinUserLinks: any[]): number => {
-  const uniqueUsers = new Set(checkinUserLinks.map((link) => link.user_id))
-  return uniqueUsers.size
-}
-
-const processUsersPerDay = (users: any[]): UserPerDay[] => {
-  const usersPerDay: Record<string, number> = {}
-
-  users.forEach((user) => {
-    const date = new Date(user.created_at).toLocaleDateString("pt-BR")
-    usersPerDay[date] = (usersPerDay[date] || 0) + 1
-  })
-
-  return Object.entries(usersPerDay)
-    .map(([date, count]) => ({ date, count }))
-    .sort((a, b) => new Date(a.date.split('/').reverse().join('-')).getTime() - new Date(b.date.split('/').reverse().join('-')).getTime())
-}
-
-const calculateAverageSurveyRating = (surveys: any[]): string => {
-  if (surveys.length === 0) return "0"
-
-  let totalRating = 0
-  let ratingCount = 0
-
-  surveys.forEach((survey) => {
-    const experienceQuestion = survey.pergunta_resposta?.find((item: any) =>
-      item.pergunta?.includes("experiência no espaço") || item.pergunta?.includes("experiencia no espaco"),
-    )
-
-    if (experienceQuestion?.resposta) {
-      const rating = Number.parseInt(experienceQuestion.resposta.charAt(0))
-      if (!isNaN(rating)) {
-        totalRating += rating
-        ratingCount += 1
-      }
-    }
-  })
-
-  return ratingCount > 0 ? (totalRating / ratingCount).toFixed(2) : "0"
-}
-
-const processSurveyQuestions = (surveys: any[]): SurveyQuestion[] => {
-  const questionsMap: Record<string, { total: number; count: number }> = {}
-
-  surveys.forEach((survey) => {
-    if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
-      survey.pergunta_resposta.forEach((item: any) => {
-        if (item.pergunta && item.resposta) {
-          const pergunta = item.pergunta
-          const resposta = item.resposta
-          const match = resposta.match(/^(\d+)/)
-          if (match) {
-            const valor = parseInt(match[1])
-            if (!questionsMap[pergunta]) {
-              questionsMap[pergunta] = { total: 0, count: 0 }
-            }
-            questionsMap[pergunta].total += valor
-            questionsMap[pergunta].count += 1
-          }
-        }
-      })
-    }
-  })
-
-  return Object.entries(questionsMap)
-    .map(([pergunta, { total, count }]) => ({
-      pergunta,
-      media: count > 0 ? Number((total / count).toFixed(2)) : 0,
-      totalRespostas: count,
-    }))
-    .filter((item) => item.totalRespostas > 0)
-}
-
-const MetricCard = ({
-  label,
-  value,
-  className = "",
-}: { label: string; value: string | number; className?: string }) => {
-  return (
-    <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)", transition: "transform 0.2s, box-shadow 0.2s" }} className={className}>
-      <div style={{ fontSize: "0.875rem", color: "#718096", marginBottom: "0.5rem", fontWeight: 500 }}>{label}</div>
-      <div style={{ fontSize: "2rem", fontWeight: 700, color: "#2d3748" }}>{value}</div>
-    </div>
-  )
-}
-
-const LineChartComponent = ({ data, xKey = "x", yKey = "y" }: { data: any[]; xKey?: string; yKey?: string }) => {
-  const formattedData = [
-    {
-      id: "data",
-      data: data.map((item) => ({
-        x: item[xKey],
-        y: item[yKey],
-      })),
-    },
-  ]
-
-  return (
-    <ResponsiveLine
-      data={formattedData}
-      margin={{ top: 20, right: 20, bottom: 80, left: 60 }}
-      xScale={{ type: "point" }}
-      yScale={{
-        type: "linear",
-        min: "auto",
-        max: "auto",
-        stacked: false,
-        reverse: false,
-      }}
-      curve="monotoneX"
-      axisTop={null}
-      axisRight={null}
-      axisBottom={{
-        tickSize: 5,
-        tickPadding: 5,
-        tickRotation: -45,
-        legend: "",
-        legendOffset: 36,
-        legendPosition: "middle",
-      }}
-      axisLeft={{
-        tickSize: 5,
-        tickPadding: 5,
-        tickRotation: 0,
-        legend: "Quantidade",
-        legendOffset: -50,
-        legendPosition: "middle",
-      }}
-      colors={{ scheme: "category10" }}
-      pointSize={8}
-      pointColor={{ theme: "background" }}
-      pointBorderWidth={2}
-      pointBorderColor={{ from: "serieColor" }}
-      pointLabelYOffset={-12}
-      useMesh={true}
-      enableArea={true}
-      areaOpacity={0.1}
-      legends={[]}
-    />
-  )
-}
-
-const BarChartComponent = ({
-  data,
-  indexBy,
-  keys,
-  colors = { scheme: "nivo" },
-  layout = "vertical"
-}: { data: any[]; indexBy: string; keys: string[]; colors?: any; layout?: "vertical" | "horizontal" }) => {
-  return (
-    <ResponsiveBar
-      data={data}
-      keys={keys}
-      indexBy={indexBy}
-      layout={layout}
-      margin={{ top: 20, right: 20, bottom: layout === "horizontal" ? 60 : 120, left: layout === "horizontal" ? 180 : 60 }}
-      padding={0.3}
-      valueScale={{ type: "linear" }}
-      indexScale={{ type: "band", round: true }}
-      colors={colors}
-      borderColor={{
-        from: "color",
-        modifiers: [["darker", 1.6]],
-      }}
-      axisTop={null}
-      axisRight={null}
-      axisBottom={{
-        tickSize: 5,
-        tickPadding: 5,
-        tickRotation: layout === "horizontal" ? 0 : -45,
-        legend: "",
-        legendPosition: "middle",
-        legendOffset: 32,
-      }}
-      axisLeft={{
-        tickSize: 5,
-        tickPadding: 5,
-        tickRotation: 0,
-        legend: "Quantidade",
-        legendPosition: "middle",
-        legendOffset: layout === "horizontal" ? -160 : -50,
-      }}
-      labelSkipWidth={12}
-      labelSkipHeight={12}
-      labelTextColor={{
-        from: "color",
-        modifiers: [["darker", 1.6]],
-      }}
-      legends={[]}
-      role="application"
-      ariaLabel="Bar chart"
-    />
-  )
-}
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
@@ -572,66 +179,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div style={{ marginBottom: "2rem", padding: "1.5rem", background: "#fff", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
-        <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem", fontWeight: 600 }}>Filtros</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
-          <div>
-            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-              Ativação <span style={{ fontSize: "0.8rem", color: "#666" }}>(afeta Check-ins, Faixa Etária, Intenção e Horários)</span>
-            </label>
-            <select
-              value={selectedActivation || ""}
-              onChange={(e) => setSelectedActivation(e.target.value ? Number(e.target.value) : undefined)}
-              style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid #ddd" }}
-            >
-              <option value="">Todas as ativações</option>
-              {dashboardData.activations.map((activation) => (
-                <option key={activation.id} value={activation.id}>
-                  {activation.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-              Data Específica <span style={{ fontSize: "0.8rem", color: "#666" }}>(afeta Picos de Horário)</span>
-            </label>
-            <select
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid #ddd" }}
-            >
-              <option value="">Todas as datas (média)</option>
-              {dashboardData.availableDates.map((date) => (
-                <option key={date} value={date}>
-                  {date}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        {(selectedActivation || selectedDate) && (
-          <div style={{ marginTop: "1rem" }}>
-            <button
-              onClick={() => {
-                setSelectedActivation(undefined)
-                setSelectedDate("")
-              }}
-              style={{
-                padding: "0.5rem 1rem",
-                background: "#f44336",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-                fontSize: "0.9rem",
-              }}
-            >
-              Limpar Filtros
-            </button>
-          </div>
-        )}
-      </div>
+      <DashboardFilters
+        activations={dashboardData.activations}
+        availableDates={dashboardData.availableDates}
+        selectedActivation={selectedActivation}
+        selectedDate={selectedDate}
+        onActivationChange={setSelectedActivation}
+        onDateChange={setSelectedDate}
+        onClearFilters={() => {
+          setSelectedActivation(undefined)
+          setSelectedDate("")
+        }}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
         <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
@@ -709,45 +268,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ gridColumn: "1 / -1", background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>Análise de Perguntas da Pesquisa de Experiências</h2>
-          <div style={{ padding: "1rem" }}>
-            {dashboardData.surveyQuestions.length > 0 ? (
-              <div style={{ display: "grid", gap: "1rem" }}>
-                {dashboardData.surveyQuestions.map((question, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      padding: "1rem",
-                      background: "#f5f5f5",
-                      borderRadius: "8px",
-                      borderLeft: "4px solid #1976d2",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, marginBottom: "0.5rem", color: "#333" }}>
-                      {question.pergunta}
-                    </div>
-                    <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
-                      <div>
-                        <span style={{ fontSize: "0.9rem", color: "#666" }}>Média: </span>
-                        <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "#1976d2" }}>
-                          {question.media.toFixed(2)}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "0.9rem", color: "#666" }}>
-                        Total de respostas: {question.totalRespostas}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ textAlign: "center", padding: "2rem", color: "#666" }}>
-                Nenhuma pergunta com respostas numéricas encontrada
-              </div>
-            )}
-          </div>
-        </div>
+        <SurveyQuestionsSection questions={dashboardData.surveyQuestions} />
       </div>
       
       <style>{`
