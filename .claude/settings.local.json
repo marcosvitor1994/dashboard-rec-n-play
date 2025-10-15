@@ -3,7 +3,8 @@
     "allow": [
       "Bash(mv:*)",
       "Bash(rm:*)",
-      "Bash(yarn build)"
+      "Bash(yarn build)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

@@ -33,13 +33,16 @@ export const processCheckinsPerActivation = (
   checkins: any[],
   activations: any[],
   checkinActivationLinks: any[],
+  surveys?: any[],
 ): CheckinPerActivation[] => {
-  const activationMap: Record<number, { name: string; count: number }> = {}
+  const activationMap: Record<number, { name: string; count: number; totalRating: number; ratingCount: number }> = {}
 
   activations.forEach((activation) => {
     activationMap[activation.id] = {
       name: activation.nome,
       count: 0,
+      totalRating: 0,
+      ratingCount: 0,
     }
   })
 
@@ -50,8 +53,45 @@ export const processCheckinsPerActivation = (
     }
   })
 
+  // Se houver pesquisas, calcular média de avaliação por ativação
+  if (surveys) {
+    surveys.forEach((survey) => {
+      if (survey.checkin_id && survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
+        // Encontrar a ativação deste checkin
+        const links = checkinActivationLinks.filter(link => link.checkin_id === survey.checkin_id)
+
+        links.forEach(link => {
+          const activation = activationMap[link.ativacao_id]
+          if (activation) {
+            // Buscar pergunta sobre experiência
+            const experienceQuestion = survey.pergunta_resposta.find((item: any) =>
+              item.pergunta?.includes("Como você avalia a sua experiência") ||
+              item.pergunta?.includes("experiência no espaço") ||
+              item.pergunta?.includes("experiencia no espaco")
+            )
+
+            if (experienceQuestion?.resposta) {
+              const match = experienceQuestion.resposta.match(/^(\d+)/)
+              if (match) {
+                const rating = parseInt(match[1])
+                activation.totalRating += rating
+                activation.ratingCount += 1
+              }
+            }
+          }
+        })
+      }
+    })
+  }
+
   return Object.values(activationMap)
     .filter((item) => item.count > 0)
+    .map(item => ({
+      name: item.name,
+      count: item.count,
+      avgRating: item.ratingCount > 0 ? Number((item.totalRating / item.ratingCount).toFixed(2)) : undefined,
+      totalRatings: item.ratingCount > 0 ? item.ratingCount : undefined,
+    }))
     .sort((a, b) => b.count - a.count)
 }
 
@@ -92,33 +132,45 @@ export const processClientIntention = (surveys: any[], activationId?: number, ch
     filteredSurveys = surveys.filter((survey) => checkinIds.includes(survey.checkin_id))
   }
 
-  const intentionCounts: Record<string, number> = {}
+  // Armazenar soma e contagem para cada tipo
+  const intentionData: Record<string, { total: number; count: number }> = {
+    "Não Clientes": { total: 0, count: 0 },
+    "Clientes": { total: 0, count: 0 }
+  }
 
   filteredSurveys.forEach((survey) => {
-    const intentionQuestion = survey.pergunta_resposta?.find((item: any) =>
-      item.pergunta?.toLowerCase().includes("intenção") ||
-      item.pergunta?.toLowerCase().includes("intencao") ||
-      item.pergunta?.toLowerCase().includes("relacionamento")
-    )
+    if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
+      survey.pergunta_resposta.forEach((item: any) => {
+        if (item.pergunta && item.resposta) {
+          const pergunta = item.pergunta.toLowerCase()
+          const match = item.resposta.match(/^(\d+)/)
 
-    if (intentionQuestion?.resposta) {
-      const response = intentionQuestion.resposta
-      const match = response.match(/^(\d+)/)
-      if (match) {
-        const value = parseInt(match[1])
-        if (value >= 4) {
-          intentionCounts["Top 2 Box (Positivo)"] = (intentionCounts["Top 2 Box (Positivo)"] || 0) + 1
-        } else {
-          intentionCounts["Outros"] = (intentionCounts["Outros"] || 0) + 1
+          if (match) {
+            const valor = parseInt(match[1])
+
+            // Pergunta para NÃO clientes (vontade de se tornar cliente)
+            if (pergunta.includes("vontade de se tornar cliente")) {
+              intentionData["Não Clientes"].total += valor
+              intentionData["Não Clientes"].count += 1
+            }
+            // Pergunta para CLIENTES (vontade de ampliar relacionamento)
+            else if (pergunta.includes("ampliar seu relacionamento") || pergunta.includes("ampliar o relacionamento")) {
+              intentionData["Clientes"].total += valor
+              intentionData["Clientes"].count += 1
+            }
+          }
         }
-      }
+      })
     }
   })
 
-  return Object.entries(intentionCounts).map(([type, count]) => ({
-    type,
-    count,
-  }))
+  // Retornar médias calculadas
+  return Object.entries(intentionData)
+    .filter(([_, data]) => data.count > 0) // Apenas categorias com respostas
+    .map(([type, data]) => ({
+      type,
+      count: Number((data.total / data.count).toFixed(2)), // Média em vez de contagem
+    }))
 }
 
 export const processActivationsByTimeWithFilters = (

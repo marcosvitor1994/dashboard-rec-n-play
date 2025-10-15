@@ -24,7 +24,8 @@ import {
 import MetricCard from "./components/dashboard/MetricCard"
 import LineChartComponent from "./components/dashboard/LineChartComponent"
 import BarChartComponent from "./components/dashboard/BarChartComponent"
-import DashboardFilters from "./components/dashboard/DashboardFilters"
+import ChartCard from "./components/dashboard/ChartCard"
+import FilterOffcanvas from "./components/dashboard/FilterOffcanvas"
 import SurveyQuestionsSection from "./components/dashboard/SurveyQuestionsSection"
 
 const API_BASE_URL = "https://api-rac-n-play.vercel.app/api/data/all"
@@ -50,13 +51,17 @@ export default function Dashboard() {
 
   const [selectedActivation, setSelectedActivation] = useState<number | undefined>(undefined)
   const [selectedDate, setSelectedDate] = useState<string>("")
-  
+
   const [filteredCheckinsPerDay, setFilteredCheckinsPerDay] = useState<CheckinPerDay[]>([])
   const [filteredAgeDistribution, setFilteredAgeDistribution] = useState<AgeDistribution[]>([])
   const [filteredClientIntention, setFilteredClientIntention] = useState<ClientIntention[]>([])
   const [filteredActivationsByTime, setFilteredActivationsByTime] = useState<ActivationByTime[]>([])
 
   const [rawData, setRawData] = useState<any>(null)
+
+  // Estados para controlar os offcanvas de filtros
+  const [isActivationFilterOpen, setIsActivationFilterOpen] = useState(false)
+  const [isTimeFilterOpen, setIsTimeFilterOpen] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,7 +92,7 @@ export default function Dashboard() {
           totalCheckins: checkins.length,
           totalResgates: resgates.length,
           checkinsPerDay: processCheckinsPerDay(checkins),
-          checkinsPerActivation: processCheckinsPerActivation(checkins, activations, checkinActivationLinks),
+          checkinsPerActivation: processCheckinsPerActivation(checkins, activations, checkinActivationLinks, surveys),
           usersPerDay: processUsersPerDay(users),
           ageDistribution: processAgeDistribution(surveys),
           clientIntention: processClientIntention(surveys),
@@ -162,113 +167,226 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ padding: "2rem", backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#1a202c", marginBottom: "0.5rem" }}>Dashboard Rec'n'Play</h1>
-        <p style={{ fontSize: "1rem", color: "#718096" }}>Banco do Brasil - Análise de Eventos e Ativações</p>
-      </div>
+    <div style={{
+      padding: "2rem",
+      backgroundColor: "#E8F4F8",
+      minHeight: "100vh",
+      position: "relative",
+      overflow: "hidden"
+    }}>
+      {/* Decorative elements */}
+      <div style={{
+        position: "fixed",
+        bottom: "20px",
+        right: "20px",
+        width: "350px",
+        height: "350px",
+        backgroundImage: "url(/cacto.png)",
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
+        opacity: 0.6,
+        zIndex: 0,
+        pointerEvents: "none"
+      }} />
+
+      <div style={{
+        position: "fixed",
+        top: "20px",
+        right: "50px",
+        width: "150px",
+        height: "150px",
+        backgroundImage: "url(/passarinho.png)",
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
+        opacity: 0.5,
+        zIndex: 0,
+        pointerEvents: "none"
+      }} />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ marginBottom: "2rem", display: "flex", alignItems: "center", gap: "1.5rem" }}>
+          <div style={{
+            width: "80px",
+            height: "80px",
+            backgroundImage: "url(/MissãoBB.png)",
+            backgroundSize: "contain",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+            flexShrink: 0
+          }} />
+          <div>
+            <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#005CA9", marginBottom: "0.5rem", margin: 0 }}>Dashboard Rec'n'Play</h1>
+            <p style={{ fontSize: "1rem", color: "#0066B3", margin: 0 }}>Banco do Brasil - Análise de Eventos e Ativações</p>
+          </div>
+        </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
-        <MetricCard label="Usuários com Ativações" value={dashboardData.totalUsers} />
+        <MetricCard label="Usuários com Ativações" value={dashboardData.totalUsers} backgroundImage="/passarinho.png" />
         <MetricCard label="Total de Check-ins" value={dashboardData.totalCheckins} />
-        <MetricCard label="Total de Resgates" value={dashboardData.totalResgates} />
+        <MetricCard label="Total de Resgates" value={dashboardData.totalResgates} backgroundImage="/cacto.png" />
         <MetricCard label="Ativações Disponíveis" value={dashboardData.checkinsPerActivation.length} />
-        <div style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)", color: "white" }}>
-          <div style={{ fontSize: "0.875rem", marginBottom: "0.5rem", fontWeight: 500, color: "rgba(255, 255, 255, 0.9)" }}>Nota Média das Pesquisas</div>
-          <div style={{ fontSize: "3rem", fontWeight: 700 }}>{dashboardData.averageSurveyRating}</div>
+        <div style={{ background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 2px 8px rgba(255, 165, 0, 0.3)", color: "#1a202c", border: "2px solid #FFD700" }}>
+          <div style={{ fontSize: "0.875rem", marginBottom: "0.5rem", fontWeight: 600, color: "#005CA9" }}>Nota Média das Pesquisas</div>
+          <div style={{ fontSize: "3rem", fontWeight: 700, color: "#005CA9" }}>{dashboardData.averageSurveyRating}</div>
         </div>
       </div>
 
-      <DashboardFilters
+      {/* Offcanvas para filtro de ativações */}
+      <FilterOffcanvas
+        isOpen={isActivationFilterOpen}
+        onClose={() => setIsActivationFilterOpen(false)}
+        title="Filtrar por Ativação"
+        showActivationFilter={true}
         activations={dashboardData.activations}
-        availableDates={dashboardData.availableDates}
         selectedActivation={selectedActivation}
-        selectedDate={selectedDate}
         onActivationChange={setSelectedActivation}
+      />
+
+      {/* Offcanvas para filtro de horários (ativação + data) */}
+      <FilterOffcanvas
+        isOpen={isTimeFilterOpen}
+        onClose={() => setIsTimeFilterOpen(false)}
+        title="Filtrar Picos de Horário"
+        showActivationFilter={true}
+        activations={dashboardData.activations}
+        selectedActivation={selectedActivation}
+        onActivationChange={setSelectedActivation}
+        showDateFilter={true}
+        availableDates={dashboardData.availableDates}
+        selectedDate={selectedDate}
         onDateChange={setSelectedDate}
-        onClearFilters={() => {
-          setSelectedActivation(undefined)
-          setSelectedDate("")
-        }}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
-        <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>
-            Check-ins por Dia {selectedActivation && `- ${dashboardData.activations.find(a => a.id === selectedActivation)?.nome}`}
-          </h2>
-          <div style={{ height: "300px" }}>
-            <LineChartComponent data={filteredCheckinsPerDay} xKey="date" yKey="count" />
-          </div>
-        </div>
+        {/* Check-ins por Dia - COM FILTRO - GRÁFICO DE BARRAS */}
+        <ChartCard
+          title="Check-ins por Dia"
+          subtitle={selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome : undefined}
+          onFilterClick={() => setIsActivationFilterOpen(true)}
+          hasActiveFilter={!!selectedActivation}
+        >
+          <BarChartComponent
+            data={filteredCheckinsPerDay}
+            indexBy="date"
+            keys={["count"]}
+            colors={["#0066B3"]}
+            labelTextColor="#ffffff"
+          />
+        </ChartCard>
 
-        <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>Check-ins por Ativação</h2>
-          <div style={{ height: "300px" }}>
-            <BarChartComponent
-              data={dashboardData.checkinsPerActivation}
-              indexBy="name"
-              keys={["count"]}
-              colors={{ scheme: "set2" }}
-              layout="horizontal"
-            />
-          </div>
-        </div>
+        {/* Check-ins por Ativação - SEM FILTRO */}
+        <ChartCard title="Check-ins por Ativação">
+          <BarChartComponent
+            data={dashboardData.checkinsPerActivation}
+            indexBy="name"
+            keys={["count"]}
+            colors={["#FFD700"]}
+            layout="horizontal"
+            tooltip={({ data }) => (
+              <div
+                style={{
+                  background: "white",
+                  padding: "12px 16px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: "8px", color: "#2d3748" }}>
+                  {data.name}
+                </div>
+                <div style={{ fontSize: "0.875rem", color: "#4a5568", marginBottom: "4px" }}>
+                  Check-ins: <strong>{data.count}</strong>
+                </div>
+                {data.avgRating !== undefined && (
+                  <>
+                    <div style={{ fontSize: "0.875rem", color: "#4a5568", marginBottom: "4px" }}>
+                      Avaliação Média: <strong>{data.avgRating}</strong>/10
+                    </div>
+                    <div style={{ fontSize: "0.875rem", color: "#718096" }}>
+                      Total de Avaliações: {data.totalRatings}
+                    </div>
+                  </>
+                )}
+                {data.avgRating === undefined && (
+                  <div style={{ fontSize: "0.875rem", color: "#a0aec0", fontStyle: "italic" }}>
+                    Sem avaliações disponíveis
+                  </div>
+                )}
+              </div>
+            )}
+          />
+        </ChartCard>
 
-        <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>
-            Distribuição por Faixa Etária {selectedActivation && `- ${dashboardData.activations.find(a => a.id === selectedActivation)?.nome}`}
-          </h2>
-          <div style={{ height: "300px" }}>
-            <BarChartComponent
-              data={filteredAgeDistribution}
-              indexBy="age"
-              keys={["count"]}
-              colors={{ scheme: "paired" }}
-              layout="horizontal"
-            />
-          </div>
-        </div>
+        {/* Faixa Etária - COM FILTRO */}
+        <ChartCard
+          title="Distribuição por Faixa Etária"
+          subtitle={selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome : undefined}
+          onFilterClick={() => setIsActivationFilterOpen(true)}
+          hasActiveFilter={!!selectedActivation}
+        >
+          <BarChartComponent
+            data={filteredAgeDistribution}
+            indexBy="age"
+            keys={["count"]}
+            colors={["#00CED1"]}
+            layout="horizontal"
+            axisLeftFormat={(value) => Math.floor(value)}
+          />
+        </ChartCard>
 
-        <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>
-            Intenção de Relacionamento (Top 2 Box) {selectedActivation && `- ${dashboardData.activations.find(a => a.id === selectedActivation)?.nome}`}
-          </h2>
-          <div style={{ height: "300px" }}>
-            <BarChartComponent
-              data={filteredClientIntention}
-              indexBy="type"
-              keys={["count"]}
-              colors={{ scheme: "accent" }}
-            />
-          </div>
-        </div>
+        {/* Intenção de Relacionamento - COM FILTRO - MOSTRA MÉDIAS */}
+        <ChartCard
+          title="Intenção de Relacionamento - Média das Notas"
+          subtitle={selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome : "Clientes vs Não Clientes"}
+          onFilterClick={() => setIsActivationFilterOpen(true)}
+          hasActiveFilter={!!selectedActivation}
+        >
+          <BarChartComponent
+            data={filteredClientIntention}
+            indexBy="type"
+            keys={["count"]}
+            colors={["#FF6B9D"]}
+            layout="horizontal"
+          />
+        </ChartCard>
 
-        <div style={{ gridColumn: "1 / -1", background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>Usuários Cadastrados por Dia</h2>
+        
+      </div>
+
+      {/* Seção de gráficos grandes - 2 colunas de 50% cada */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "2rem" }}>
+        {/* Usuários Cadastrados - SEM FILTRO - GRÁFICO DE BARRAS */}
+        <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 2px 8px rgba(0, 91, 169, 0.1)", border: "1px solid #E8F4F8" }}>
+          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#005CA9", marginBottom: "1rem" }}>Usuários Cadastrados por Dia</h2>
           <div style={{ height: "400px" }}>
-            <LineChartComponent data={dashboardData.usersPerDay} xKey="date" yKey="count" />
-          </div>
-        </div>
-
-        <div style={{ gridColumn: "1 / -1", background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>
-            Picos de Horário das Ativações
-            {selectedActivation && ` - ${dashboardData.activations.find(a => a.id === selectedActivation)?.nome}`}
-            {selectedDate && ` - ${selectedDate}`}
-            {!selectedDate && " (Média de todos os dias)"}
-          </h2>
-          <div style={{ height: "400px" }}>
             <BarChartComponent
-              data={filteredActivationsByTime}
-              indexBy="time"
+              data={dashboardData.usersPerDay}
+              indexBy="date"
               keys={["count"]}
-              colors={{ scheme: "category10" }}
+              colors={["#9B59B6"]}
+              labelTextColor="#ffffff"
             />
           </div>
         </div>
 
-        <SurveyQuestionsSection questions={dashboardData.surveyQuestions} />
+        {/* Picos de Horário - COM FILTRO DUPLO (Ativação + Data) - GRÁFICO DE LINHAS */}
+        <ChartCard
+          title="Picos de Horário das Ativações"
+          subtitle={
+            selectedActivation || selectedDate
+              ? `${selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome || '' : ''}${selectedActivation && selectedDate ? ' - ' : ''}${selectedDate || ''}${!selectedDate && !selectedActivation ? '' : ''}`
+              : "(Média de todos os dias)"
+          }
+          onFilterClick={() => setIsTimeFilterOpen(true)}
+          hasActiveFilter={!!(selectedActivation || selectedDate)}
+        >
+          <LineChartComponent
+            data={filteredActivationsByTime}
+            xKey="time"
+            yKey="count"
+          />
+        </ChartCard>
       </div>
       
       <style>{`
@@ -277,6 +395,9 @@ export default function Dashboard() {
           100% { transform: rotate(360deg); }
         }
       `}</style>
+
+      <SurveyQuestionsSection questions={dashboardData.surveyQuestions} />
+      </div>
     </div>
   )
 }

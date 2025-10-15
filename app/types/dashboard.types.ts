@@ -6,6 +6,8 @@ export interface CheckinPerDay {
 export interface CheckinPerActivation {
   name: string
   count: number
+  avgRating?: number
+  totalRatings?: number
 }
 
 export interface UserPerDay {
