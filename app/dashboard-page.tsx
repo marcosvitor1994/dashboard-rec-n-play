@@ -80,6 +80,8 @@ export default function Dashboard() {
         const resgates = getPublishedData(data.tables?.resgates?.data || [])
         const checkinActivationLinks = data.tables?.checkins_ativacao_lnk?.data || []
         const checkinUserLinks = data.tables?.checkins_users_permissions_user_lnk?.data || []
+        const avaliacaoAtivacoes = getPublishedData(data.tables?.avaliacao_de_ativacaos?.data || [])
+        const avaliacaoAtivacaoLinks = data.tables?.avaliacao_de_ativacaos_ativacao_lnk?.data || []
 
         setRawData({
           checkins,
@@ -92,7 +94,7 @@ export default function Dashboard() {
           totalCheckins: checkins.length,
           totalResgates: resgates.length,
           checkinsPerDay: processCheckinsPerDay(checkins),
-          checkinsPerActivation: processCheckinsPerActivation(checkins, activations, checkinActivationLinks, surveys),
+          checkinsPerActivation: processCheckinsPerActivation(checkins, activations, checkinActivationLinks, avaliacaoAtivacoes, avaliacaoAtivacaoLinks),
           usersPerDay: processUsersPerDay(users),
           ageDistribution: processAgeDistribution(surveys),
           clientIntention: processClientIntention(surveys),

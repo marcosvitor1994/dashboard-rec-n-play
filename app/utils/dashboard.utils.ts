@@ -33,7 +33,8 @@ export const processCheckinsPerActivation = (
   checkins: any[],
   activations: any[],
   checkinActivationLinks: any[],
-  surveys?: any[],
+  avaliacaoAtivacoes?: any[],
+  avaliacaoAtivacaoLinks?: any[],
 ): CheckinPerActivation[] => {
   const activationMap: Record<number, { name: string; count: number; totalRating: number; ratingCount: number }> = {}
 
@@ -53,34 +54,23 @@ export const processCheckinsPerActivation = (
     }
   })
 
-  // Se houver pesquisas, calcular média de avaliação por ativação
-  if (surveys) {
-    surveys.forEach((survey) => {
-      if (survey.checkin_id && survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
-        // Encontrar a ativação deste checkin
-        const links = checkinActivationLinks.filter(link => link.checkin_id === survey.checkin_id)
+  // Calcular média de avaliação por ativação usando a tabela avaliacao_de_ativacaos
+  if (avaliacaoAtivacoes && avaliacaoAtivacaoLinks) {
+    avaliacaoAtivacoes.forEach((avaliacao) => {
+      // Encontrar as ativações vinculadas a esta avaliação
+      const links = avaliacaoAtivacaoLinks.filter(link => link.avaliacao_de_ativacao_id === avaliacao.id)
 
-        links.forEach(link => {
-          const activation = activationMap[link.ativacao_id]
-          if (activation) {
-            // Buscar pergunta sobre experiência
-            const experienceQuestion = survey.pergunta_resposta.find((item: any) =>
-              item.pergunta?.includes("Como você avalia a sua experiência") ||
-              item.pergunta?.includes("experiência no espaço") ||
-              item.pergunta?.includes("experiencia no espaco")
-            )
-
-            if (experienceQuestion?.resposta) {
-              const match = experienceQuestion.resposta.match(/^(\d+)/)
-              if (match) {
-                const rating = parseInt(match[1])
-                activation.totalRating += rating
-                activation.ratingCount += 1
-              }
-            }
+      links.forEach(link => {
+        const activation = activationMap[link.ativacao_id]
+        if (activation && avaliacao.avaliacao) {
+          // Converter a avaliação para número
+          const rating = parseInt(avaliacao.avaliacao)
+          if (!isNaN(rating)) {
+            activation.totalRating += rating
+            activation.ratingCount += 1
           }
-        })
-      }
+        }
+      })
     })
   }
 
@@ -102,7 +92,15 @@ export const processAgeDistribution = (surveys: any[], activationId?: number, ch
     const checkinIds = checkinActivationLinks
       .filter((link) => link.ativacao_id === activationId)
       .map((link) => link.checkin_id)
+
+    console.log('Ativação selecionada:', activationId)
+    console.log('Check-in IDs da ativação:', checkinIds)
+    console.log('Total de pesquisas antes do filtro:', surveys.length)
+
     filteredSurveys = surveys.filter((survey) => checkinIds.includes(survey.checkin_id))
+
+    console.log('Total de pesquisas após filtro:', filteredSurveys.length)
+    console.log('IDs das pesquisas filtradas:', filteredSurveys.map(s => ({ id: s.id, checkin_id: s.checkin_id })))
   }
 
   const ageGroups: Record<string, number> = {}
@@ -129,7 +127,14 @@ export const processClientIntention = (surveys: any[], activationId?: number, ch
     const checkinIds = checkinActivationLinks
       .filter((link) => link.ativacao_id === activationId)
       .map((link) => link.checkin_id)
+
+    console.log('[ClientIntention] Ativação selecionada:', activationId)
+    console.log('[ClientIntention] Check-in IDs da ativação:', checkinIds)
+    console.log('[ClientIntention] Total de pesquisas antes do filtro:', surveys.length)
+
     filteredSurveys = surveys.filter((survey) => checkinIds.includes(survey.checkin_id))
+
+    console.log('[ClientIntention] Total de pesquisas após filtro:', filteredSurveys.length)
   }
 
   // Armazenar soma e contagem para cada tipo
