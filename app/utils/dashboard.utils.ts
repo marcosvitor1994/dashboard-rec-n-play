@@ -86,26 +86,11 @@ export const processCheckinsPerActivation = (
 }
 
 export const processAgeDistribution = (surveys: any[], activationId?: number, checkinActivationLinks?: any[]): AgeDistribution[] => {
-  let filteredSurveys = surveys
-
-  if (activationId && checkinActivationLinks) {
-    const checkinIds = checkinActivationLinks
-      .filter((link) => link.ativacao_id === activationId)
-      .map((link) => link.checkin_id)
-
-    console.log('Ativação selecionada:', activationId)
-    console.log('Check-in IDs da ativação:', checkinIds)
-    console.log('Total de pesquisas antes do filtro:', surveys.length)
-
-    filteredSurveys = surveys.filter((survey) => checkinIds.includes(survey.checkin_id))
-
-    console.log('Total de pesquisas após filtro:', filteredSurveys.length)
-    console.log('IDs das pesquisas filtradas:', filteredSurveys.map(s => ({ id: s.id, checkin_id: s.checkin_id })))
-  }
-
+  // Pesquisas de experiência são gerais do evento, não por ativação
+  // Por isso ignoramos o filtro de ativação
   const ageGroups: Record<string, number> = {}
 
-  filteredSurveys.forEach((survey) => {
+  surveys.forEach((survey) => {
     const ageQuestion = survey.pergunta_resposta?.find((item: any) => item.pergunta?.includes("idade"))
 
     if (ageQuestion?.resposta) {
@@ -121,29 +106,14 @@ export const processAgeDistribution = (surveys: any[], activationId?: number, ch
 }
 
 export const processClientIntention = (surveys: any[], activationId?: number, checkinActivationLinks?: any[]): ClientIntention[] => {
-  let filteredSurveys = surveys
-
-  if (activationId && checkinActivationLinks) {
-    const checkinIds = checkinActivationLinks
-      .filter((link) => link.ativacao_id === activationId)
-      .map((link) => link.checkin_id)
-
-    console.log('[ClientIntention] Ativação selecionada:', activationId)
-    console.log('[ClientIntention] Check-in IDs da ativação:', checkinIds)
-    console.log('[ClientIntention] Total de pesquisas antes do filtro:', surveys.length)
-
-    filteredSurveys = surveys.filter((survey) => checkinIds.includes(survey.checkin_id))
-
-    console.log('[ClientIntention] Total de pesquisas após filtro:', filteredSurveys.length)
-  }
-
-  // Armazenar soma e contagem para cada tipo
+  // Pesquisas de experiência são gerais do evento, não por ativação
+  // Por isso ignoramos o filtro de ativação
   const intentionData: Record<string, { total: number; count: number }> = {
     "Não Clientes": { total: 0, count: 0 },
     "Clientes": { total: 0, count: 0 }
   }
 
-  filteredSurveys.forEach((survey) => {
+  surveys.forEach((survey) => {
     if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
       survey.pergunta_resposta.forEach((item: any) => {
         if (item.pergunta && item.resposta) {

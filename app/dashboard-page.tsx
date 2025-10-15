@@ -320,12 +320,9 @@ export default function Dashboard() {
           />
         </ChartCard>
 
-        {/* Faixa Etária - COM FILTRO */}
+        {/* Faixa Etária - SEM FILTRO (dados gerais da pesquisa de experiência) */}
         <ChartCard
           title="Distribuição por Faixa Etária"
-          subtitle={selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome : undefined}
-          onFilterClick={() => setIsActivationFilterOpen(true)}
-          hasActiveFilter={!!selectedActivation}
         >
           <BarChartComponent
             data={filteredAgeDistribution}
@@ -337,12 +334,10 @@ export default function Dashboard() {
           />
         </ChartCard>
 
-        {/* Intenção de Relacionamento - COM FILTRO - MOSTRA MÉDIAS */}
+        {/* Intenção de Relacionamento - SEM FILTRO (dados gerais da pesquisa de experiência) */}
         <ChartCard
           title="Intenção de Relacionamento - Média das Notas"
-          subtitle={selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome : "Clientes vs Não Clientes"}
-          onFilterClick={() => setIsActivationFilterOpen(true)}
-          hasActiveFilter={!!selectedActivation}
+          subtitle="Clientes vs Não Clientes"
         >
           <BarChartComponent
             data={filteredClientIntention}
