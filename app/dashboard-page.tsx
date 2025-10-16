@@ -17,6 +17,7 @@ import {
   calculateAverageSurveyRating,
   processActivationsByTimeWithFilters,
   processSurveyQuestions,
+  processComments,
   getAvailableDates,
   getPublishedData,
   getUniqueUsersWithActivations,
@@ -27,6 +28,7 @@ import BarChartComponent from "./components/dashboard/BarChartComponent"
 import ChartCard from "./components/dashboard/ChartCard"
 import FilterOffcanvas from "./components/dashboard/FilterOffcanvas"
 import SurveyQuestionsSection from "./components/dashboard/SurveyQuestionsSection"
+import CommentsCard from "./components/dashboard/CommentsCard"
 
 const API_BASE_URL = "https://api-rac-n-play.vercel.app/api/data/all"
 
@@ -45,6 +47,7 @@ export default function Dashboard() {
     averageSurveyRating: "0",
     activationsByTime: [],
     surveyQuestions: [],
+    comments: [],
     activations: [],
     availableDates: [],
   })
@@ -101,6 +104,7 @@ export default function Dashboard() {
           averageSurveyRating: calculateAverageSurveyRating(surveys),
           activationsByTime: processActivationsByTimeWithFilters(checkins, checkinActivationLinks),
           surveyQuestions: processSurveyQuestions(surveys),
+          comments: processComments(surveys),
           activations: activations.map((a: any) => ({ id: a.id, nome: a.nome })),
           availableDates: getAvailableDates(checkins),
         }
@@ -394,6 +398,11 @@ export default function Dashboard() {
       `}</style>
 
       <SurveyQuestionsSection questions={dashboardData.surveyQuestions} />
+
+      {/* Card de Comentários */}
+      <div style={{ marginTop: "2rem" }}>
+        <CommentsCard comments={dashboardData.comments} />
+      </div>
       </div>
     </div>
   )

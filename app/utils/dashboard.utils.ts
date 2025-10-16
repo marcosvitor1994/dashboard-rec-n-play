@@ -272,3 +272,40 @@ export const processSurveyQuestions = (surveys: any[]): SurveyQuestion[] => {
     .filter((item) => item.totalRespostas > 0)
     .filter((item) => !item.pergunta.toLowerCase().includes("idade"))
 }
+
+export const processComments = (surveys: any[]): { id: number; comment: string; date: string; age?: string; isClient?: string }[] => {
+  const comments: { id: number; comment: string; date: string; age?: string; isClient?: string }[] = []
+
+  surveys.forEach((survey) => {
+    if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
+      // Extrair informações de idade e se é cliente
+      let age: string | undefined
+      let isClient: string | undefined
+
+      survey.pergunta_resposta.forEach((item: any) => {
+        if (item.pergunta?.toLowerCase().includes("idade") && item.resposta) {
+          age = item.resposta
+        }
+        if (item.pergunta?.toLowerCase().includes("cliente bb") && item.resposta) {
+          isClient = item.resposta
+        }
+      })
+
+      // Buscar comentários
+      survey.pergunta_resposta.forEach((item: any) => {
+        if (item.comentario && item.comentario.trim() !== "") {
+          comments.push({
+            id: survey.id,
+            comment: item.comentario,
+            date: survey.created_at || survey.updated_at,
+            age: age,
+            isClient: isClient,
+          })
+        }
+      })
+    }
+  })
+
+  // Ordenar por data mais recente primeiro
+  return comments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+}

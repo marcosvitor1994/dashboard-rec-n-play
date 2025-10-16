@@ -36,6 +36,14 @@ export interface SurveyQuestion {
   totalRespostas: number
 }
 
+export interface Comment {
+  id: number
+  comment: string
+  date: string
+  age?: string
+  isClient?: string
+}
+
 export interface Activation {
   id: number
   nome: string
@@ -53,6 +61,7 @@ export interface DashboardData {
   averageSurveyRating: string
   activationsByTime: ActivationByTime[]
   surveyQuestions: SurveyQuestion[]
+  comments: Comment[]
   activations: Activation[]
   availableDates: string[]
 }
