@@ -78,10 +78,12 @@ export interface DashboardData {
   clientIntention: ClientIntention[]
   clientDistribution: ClientDistribution
   averageSurveyRating: string
+  surveyGrade: number
   activationsByTime: ActivationByTime[]
   surveyQuestions: SurveyQuestion[]
   satisfactionBlocks: SatisfactionBlock[]
   comments: Comment[]
   activations: Activation[]
   availableDates: string[]
+  availableAgeRanges: string[]
 }

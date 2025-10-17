@@ -10,6 +10,45 @@ import type {
   SatisfactionBlock,
 } from "../types/dashboard.types"
 
+// Função auxiliar para filtrar surveys por faixa etária e tipo de cliente
+const filterSurveys = (surveys: any[], ageRange?: string, clientType?: string): any[] => {
+  let filtered = surveys
+
+  if (ageRange) {
+    filtered = filtered.filter(survey => {
+      const ageQuestion = survey.pergunta_resposta?.find((item: any) =>
+        item.pergunta?.toLowerCase().includes("idade")
+      )
+      return ageQuestion?.resposta === ageRange
+    })
+  }
+
+  if (clientType) {
+    filtered = filtered.filter(survey => {
+      const clientQuestion = survey.pergunta_resposta?.find((item: any) =>
+        item.pergunta?.toLowerCase().includes("você é cliente bb") ||
+        item.pergunta?.toLowerCase().includes("voce e cliente bb") ||
+        item.pergunta?.toLowerCase().includes("cliente do banco do brasil")
+      )
+
+      if (!clientQuestion?.resposta) return false
+
+      const resposta = clientQuestion.resposta.toLowerCase()
+      const isClient = resposta.includes("sim") || resposta === "1 - sim"
+
+      return clientType === "client" ? isClient : !isClient
+    })
+  }
+
+  return filtered
+}
+
+// Função auxiliar para obter IDs de surveys filtrados
+const getFilteredSurveyIds = (surveys: any[], ageRange?: string, clientType?: string): Set<number> => {
+  const filtered = filterSurveys(surveys, ageRange, clientType)
+  return new Set(filtered.map(s => s.id))
+}
+
 export const processCheckinsPerDay = (checkins: any[], activationId?: number, checkinActivationLinks?: any[]): CheckinPerDay[] => {
   let filteredCheckins = checkins
 
@@ -87,12 +126,13 @@ export const processCheckinsPerActivation = (
     .sort((a, b) => b.count - a.count)
 }
 
-export const processAgeDistribution = (surveys: any[], activationId?: number, checkinActivationLinks?: any[]): AgeDistribution[] => {
-  // Pesquisas de experiência são gerais do evento, não por ativação
-  // Por isso ignoramos o filtro de ativação
+export const processAgeDistribution = (surveys: any[], activationId?: number, checkinActivationLinks?: any[], ageRange?: string, clientType?: string): AgeDistribution[] => {
+  // Aplicar filtros de faixa etária e tipo de cliente
+  const filteredSurveys = filterSurveys(surveys, ageRange, clientType)
+
   const ageGroups: Record<string, number> = {}
 
-  surveys.forEach((survey) => {
+  filteredSurveys.forEach((survey) => {
     const ageQuestion = survey.pergunta_resposta?.find((item: any) => item.pergunta?.includes("idade"))
 
     if (ageQuestion?.resposta) {
@@ -107,15 +147,16 @@ export const processAgeDistribution = (surveys: any[], activationId?: number, ch
   }))
 }
 
-export const processClientIntention = (surveys: any[], activationId?: number, checkinActivationLinks?: any[]): ClientIntention[] => {
-  // Pesquisas de experiência são gerais do evento, não por ativação
-  // Por isso ignoramos o filtro de ativação
+export const processClientIntention = (surveys: any[], activationId?: number, checkinActivationLinks?: any[], ageRange?: string, clientType?: string): ClientIntention[] => {
+  // Aplicar filtros de faixa etária e tipo de cliente
+  const filteredSurveys = filterSurveys(surveys, ageRange, clientType)
+
   const intentionData: Record<string, { total: number; count: number }> = {
     "Não Clientes": { total: 0, count: 0 },
     "Clientes": { total: 0, count: 0 }
   }
 
-  surveys.forEach((survey) => {
+  filteredSurveys.forEach((survey) => {
     if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
       survey.pergunta_resposta.forEach((item: any) => {
         if (item.pergunta && item.resposta) {
@@ -150,11 +191,14 @@ export const processClientIntention = (surveys: any[], activationId?: number, ch
     }))
 }
 
-export const processClientDistribution = (surveys: any[]): ClientDistribution => {
+export const processClientDistribution = (surveys: any[], ageRange?: string, clientType?: string): ClientDistribution => {
+  // Aplicar filtros de faixa etária e tipo de cliente
+  const filteredSurveys = filterSurveys(surveys, ageRange, clientType)
+
   let clients = 0
   let nonClients = 0
 
-  surveys.forEach((survey) => {
+  filteredSurveys.forEach((survey) => {
     if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
       const clientQuestion = survey.pergunta_resposta.find((item: any) =>
         item.pergunta?.toLowerCase().includes("você é cliente bb") ||
@@ -233,6 +277,19 @@ export const getAvailableDates = (checkins: any[]): string[] => {
   )
 }
 
+export const getAvailableAgeRanges = (surveys: any[]): string[] => {
+  const ageRanges = new Set<string>()
+  surveys.forEach((survey) => {
+    const ageQuestion = survey.pergunta_resposta?.find((item: any) =>
+      item.pergunta?.toLowerCase().includes("idade")
+    )
+    if (ageQuestion?.resposta) {
+      ageRanges.add(ageQuestion.resposta)
+    }
+  })
+  return Array.from(ageRanges).sort()
+}
+
 export const getPublishedData = (dataArray: any[]) => {
   return dataArray.filter((item) => item.published_at !== null)
 }
@@ -278,10 +335,20 @@ export const calculateAverageSurveyRating = (surveys: any[]): string => {
   return ratingCount > 0 ? (totalRating / ratingCount).toFixed(2) : "0"
 }
 
-export const processSurveyQuestions = (surveys: any[]): SurveyQuestion[] => {
+export const calculateSurveyGrade = (averageRating: string | number): number => {
+  const rating = typeof averageRating === 'string' ? parseFloat(averageRating) : averageRating
+  if (isNaN(rating) || rating === 0) return 0
+  const grade = ((rating - 1) / 4) * 100
+  return Number(grade.toFixed(2))
+}
+
+export const processSurveyQuestions = (surveys: any[], ageRange?: string, clientType?: string): SurveyQuestion[] => {
+  // Aplicar filtros de faixa etária e tipo de cliente
+  const filteredSurveys = filterSurveys(surveys, ageRange, clientType)
+
   const questionsMap: Record<string, { total: number; count: number }> = {}
 
-  surveys.forEach((survey) => {
+  filteredSurveys.forEach((survey) => {
     if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
       survey.pergunta_resposta.forEach((item: any) => {
         if (item.pergunta && item.resposta) {

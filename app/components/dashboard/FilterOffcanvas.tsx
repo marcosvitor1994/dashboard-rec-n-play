@@ -19,6 +19,17 @@ interface FilterOffcanvasProps {
   availableDates?: string[]
   selectedDate?: string
   onDateChange?: (date: string) => void
+
+  // Filtro de Faixa Etária
+  showAgeRangeFilter?: boolean
+  availableAgeRanges?: string[]
+  selectedAgeRange?: string
+  onAgeRangeChange?: (ageRange: string) => void
+
+  // Filtro de Tipo de Cliente
+  showClientTypeFilter?: boolean
+  selectedClientType?: string
+  onClientTypeChange?: (clientType: string) => void
 }
 
 export default function FilterOffcanvas({
@@ -33,6 +44,13 @@ export default function FilterOffcanvas({
   availableDates = [],
   selectedDate,
   onDateChange,
+  showAgeRangeFilter = false,
+  availableAgeRanges = [],
+  selectedAgeRange,
+  onAgeRangeChange,
+  showClientTypeFilter = false,
+  selectedClientType,
+  onClientTypeChange,
 }: FilterOffcanvasProps) {
   // Bloquear scroll do body quando offcanvas está aberto
   useEffect(() => {
@@ -49,9 +67,11 @@ export default function FilterOffcanvas({
   const handleClearFilters = () => {
     if (onActivationChange) onActivationChange(undefined)
     if (onDateChange) onDateChange("")
+    if (onAgeRangeChange) onAgeRangeChange("")
+    if (onClientTypeChange) onClientTypeChange("")
   }
 
-  const hasActiveFilters = selectedActivation || selectedDate
+  const hasActiveFilters = selectedActivation || selectedDate || selectedAgeRange || selectedClientType
 
   return (
     <>
@@ -194,6 +214,81 @@ export default function FilterOffcanvas({
               </select>
               <p style={{ fontSize: "0.8rem", color: "#718096", marginTop: "0.5rem" }}>
                 Selecione uma data específica para análise detalhada
+              </p>
+            </div>
+          )}
+
+          {showAgeRangeFilter && (
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "0.5rem",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  color: "#2d3748",
+                }}
+              >
+                Faixa Etária
+              </label>
+              <select
+                value={selectedAgeRange || ""}
+                onChange={(e) => onAgeRangeChange?.(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "8px",
+                  border: "1px solid #cbd5e0",
+                  fontSize: "0.95rem",
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">Todas as faixas etárias</option>
+                {availableAgeRanges.map((ageRange) => (
+                  <option key={ageRange} value={ageRange}>
+                    {ageRange}
+                  </option>
+                ))}
+              </select>
+              <p style={{ fontSize: "0.8rem", color: "#718096", marginTop: "0.5rem" }}>
+                Filtra os dados de satisfação por faixa etária
+              </p>
+            </div>
+          )}
+
+          {showClientTypeFilter && (
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "0.5rem",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  color: "#2d3748",
+                }}
+              >
+                Tipo de Cliente
+              </label>
+              <select
+                value={selectedClientType || ""}
+                onChange={(e) => onClientTypeChange?.(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "8px",
+                  border: "1px solid #cbd5e0",
+                  fontSize: "0.95rem",
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">Todos (Clientes + Não Clientes)</option>
+                <option value="client">Somente Clientes BB</option>
+                <option value="non-client">Somente Não Clientes</option>
+              </select>
+              <p style={{ fontSize: "0.8rem", color: "#718096", marginTop: "0.5rem" }}>
+                Filtra os dados por tipo de cliente do Banco do Brasil
               </p>
             </div>
           )}

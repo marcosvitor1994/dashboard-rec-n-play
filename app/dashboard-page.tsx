@@ -16,11 +16,13 @@ import {
   processClientIntention,
   processClientDistribution,
   calculateAverageSurveyRating,
+  calculateSurveyGrade,
   processActivationsByTimeWithFilters,
   processSurveyQuestions,
   processSatisfactionBlocks,
   processComments,
   getAvailableDates,
+  getAvailableAgeRanges,
   getPublishedData,
   getUniqueUsersWithActivations,
 } from "./utils/dashboard.utils"
@@ -56,16 +58,20 @@ export default function Dashboard() {
       nonClientsPercentage: 0,
     },
     averageSurveyRating: "0",
+    surveyGrade: 0,
     activationsByTime: [],
     surveyQuestions: [],
     satisfactionBlocks: [],
     comments: [],
     activations: [],
     availableDates: [],
+    availableAgeRanges: [],
   })
 
   const [selectedActivation, setSelectedActivation] = useState<number | undefined>(undefined)
   const [selectedDate, setSelectedDate] = useState<string>("")
+  const [selectedAgeRange, setSelectedAgeRange] = useState<string>("")
+  const [selectedClientType, setSelectedClientType] = useState<string>("")
 
   const [filteredCheckinsPerDay, setFilteredCheckinsPerDay] = useState<CheckinPerDay[]>([])
   const [filteredAgeDistribution, setFilteredAgeDistribution] = useState<AgeDistribution[]>([])
@@ -106,6 +112,9 @@ export default function Dashboard() {
         const surveyQuestions = processSurveyQuestions(surveys)
         const satisfactionBlocks = processSatisfactionBlocks(surveyQuestions)
         const clientDistribution = processClientDistribution(surveys)
+        const availableAgeRanges = getAvailableAgeRanges(surveys)
+        const averageSurveyRating = calculateAverageSurveyRating(surveys)
+        const surveyGrade = calculateSurveyGrade(averageSurveyRating)
 
         const processedData: DashboardData = {
           totalUsers: getUniqueUsersWithActivations(checkinUserLinks),
@@ -117,13 +126,15 @@ export default function Dashboard() {
           ageDistribution: processAgeDistribution(surveys),
           clientIntention: processClientIntention(surveys),
           clientDistribution,
-          averageSurveyRating: calculateAverageSurveyRating(surveys),
+          averageSurveyRating,
+          surveyGrade,
           activationsByTime: processActivationsByTimeWithFilters(checkins, checkinActivationLinks),
           surveyQuestions,
           satisfactionBlocks,
           comments: processComments(surveys),
           activations: activations.map((a: any) => ({ id: a.id, nome: a.nome })),
           availableDates: getAvailableDates(checkins),
+          availableAgeRanges,
         }
 
         setDashboardData(processedData)
@@ -146,18 +157,20 @@ export default function Dashboard() {
   useEffect(() => {
     if (!rawData) return
 
+    // Aplicar filtros de check-ins (ativação e data)
     setFilteredCheckinsPerDay(
       processCheckinsPerDay(rawData.checkins, selectedActivation, rawData.checkinActivationLinks)
     )
-    
+
+    // Aplicar filtros de faixa etária e tipo de cliente nos dados de satisfação
     setFilteredAgeDistribution(
-      processAgeDistribution(rawData.surveys, selectedActivation, rawData.checkinActivationLinks)
+      processAgeDistribution(rawData.surveys, selectedActivation, rawData.checkinActivationLinks, selectedAgeRange, selectedClientType)
     )
-    
+
     setFilteredClientIntention(
-      processClientIntention(rawData.surveys, selectedActivation, rawData.checkinActivationLinks)
+      processClientIntention(rawData.surveys, selectedActivation, rawData.checkinActivationLinks, selectedAgeRange, selectedClientType)
     )
-    
+
     setFilteredActivationsByTime(
       processActivationsByTimeWithFilters(
         rawData.checkins,
@@ -166,7 +179,18 @@ export default function Dashboard() {
         selectedDate
       )
     )
-  }, [selectedActivation, selectedDate, rawData])
+
+    // Recalcular blocos de satisfação e distribuição de clientes quando filtros mudarem
+    const filteredSurveyQuestions = processSurveyQuestions(rawData.surveys, selectedAgeRange, selectedClientType)
+    const filteredSatisfactionBlocks = processSatisfactionBlocks(filteredSurveyQuestions)
+    const filteredClientDistribution = processClientDistribution(rawData.surveys, selectedAgeRange, selectedClientType)
+
+    setDashboardData(prev => ({
+      ...prev,
+      satisfactionBlocks: filteredSatisfactionBlocks,
+      clientDistribution: filteredClientDistribution,
+    }))
+  }, [selectedActivation, selectedDate, selectedAgeRange, selectedClientType, rawData])
 
   if (loading) {
     return (
@@ -250,7 +274,13 @@ export default function Dashboard() {
         <MetricCard label="Ativações Disponíveis" value={dashboardData.checkinsPerActivation.length} />
         <div style={{ background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 2px 8px rgba(255, 165, 0, 0.3)", color: "#1a202c", border: "2px solid #FFD700" }}>
           <div style={{ fontSize: "0.875rem", marginBottom: "0.5rem", fontWeight: 600, color: "#005CA9" }}>Nota Média das Pesquisas</div>
-          <div style={{ fontSize: "3rem", fontWeight: 700, color: "#005CA9" }}>{dashboardData.averageSurveyRating}</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <div style={{ fontSize: "3rem", fontWeight: 700, color: "#005CA9" }}>{dashboardData.averageSurveyRating}</div>
+            <div style={{ fontSize: "1rem", color: "#005CA9", opacity: 0.7 }}>/5</div>
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "#005CA9", opacity: 0.8, marginTop: "0.25rem" }}>
+            Grau de Satisfação: <strong style={{ fontSize: "1.25rem" }}>{dashboardData.surveyGrade}%</strong>
+          </div>
         </div>
       </div>
 
@@ -267,6 +297,13 @@ export default function Dashboard() {
         availableDates={dashboardData.availableDates}
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
+        showAgeRangeFilter={true}
+        availableAgeRanges={dashboardData.availableAgeRanges}
+        selectedAgeRange={selectedAgeRange}
+        onAgeRangeChange={setSelectedAgeRange}
+        showClientTypeFilter={true}
+        selectedClientType={selectedClientType}
+        onClientTypeChange={setSelectedClientType}
       />
 
       {/* Botão para abrir o filtro global */}
@@ -292,7 +329,7 @@ export default function Dashboard() {
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M14.5 2H1.5L6.5 8.088V12.5L9.5 14V8.088L14.5 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        {(selectedActivation || selectedDate) ? "Filtros Ativos" : "Filtrar"}
+        {(selectedActivation || selectedDate || selectedAgeRange || selectedClientType) ? "Filtros Ativos" : "Filtrar"}
       </button>
 
       
