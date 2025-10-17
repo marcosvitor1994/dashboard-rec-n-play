@@ -306,7 +306,7 @@ export default function Dashboard() {
         onClientTypeChange={setSelectedClientType}
       />
 
-      {/* Botão para abrir o filtro global */}
+      {/* Botão para abrir o filtro global 
       <button
         onClick={() => setIsFilterOpen(true)}
         style={{
@@ -331,6 +331,7 @@ export default function Dashboard() {
         </svg>
         {(selectedActivation || selectedDate || selectedAgeRange || selectedClientType) ? "Filtros Ativos" : "Filtrar"}
       </button>
+      */}
 
       
 
