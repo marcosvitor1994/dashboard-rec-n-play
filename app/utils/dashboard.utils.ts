@@ -3,6 +3,7 @@ import type {
   CheckinPerActivation,
   AgeDistribution,
   ClientIntention,
+  ClientDistribution,
   ActivationByTime,
   UserPerDay,
   SurveyQuestion,
@@ -147,6 +148,42 @@ export const processClientIntention = (surveys: any[], activationId?: number, ch
       type,
       count: Number((data.total / data.count).toFixed(2)), // Média em vez de contagem
     }))
+}
+
+export const processClientDistribution = (surveys: any[]): ClientDistribution => {
+  let clients = 0
+  let nonClients = 0
+
+  surveys.forEach((survey) => {
+    if (survey.pergunta_resposta && Array.isArray(survey.pergunta_resposta)) {
+      const clientQuestion = survey.pergunta_resposta.find((item: any) =>
+        item.pergunta?.toLowerCase().includes("você é cliente bb") ||
+        item.pergunta?.toLowerCase().includes("voce e cliente bb") ||
+        item.pergunta?.toLowerCase().includes("cliente do banco do brasil")
+      )
+
+      if (clientQuestion?.resposta) {
+        const resposta = clientQuestion.resposta.toLowerCase()
+        if (resposta.includes("sim") || resposta === "1 - sim") {
+          clients += 1
+        } else if (resposta.includes("não") || resposta.includes("nao") || resposta === "2 - não") {
+          nonClients += 1
+        }
+      }
+    }
+  })
+
+  const totalResponses = clients + nonClients
+  const clientsPercentage = totalResponses > 0 ? (clients / totalResponses) * 100 : 0
+  const nonClientsPercentage = totalResponses > 0 ? (nonClients / totalResponses) * 100 : 0
+
+  return {
+    totalResponses,
+    clients,
+    nonClients,
+    clientsPercentage: Number(clientsPercentage.toFixed(2)),
+    nonClientsPercentage: Number(nonClientsPercentage.toFixed(2)),
+  }
 }
 
 export const processActivationsByTimeWithFilters = (

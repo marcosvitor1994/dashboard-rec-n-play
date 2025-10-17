@@ -25,6 +25,14 @@ export interface ClientIntention {
   count: number
 }
 
+export interface ClientDistribution {
+  totalResponses: number
+  clients: number
+  nonClients: number
+  clientsPercentage: number
+  nonClientsPercentage: number
+}
+
 export interface ActivationByTime {
   time: string
   count: number
@@ -68,6 +76,7 @@ export interface DashboardData {
   usersPerDay: UserPerDay[]
   ageDistribution: AgeDistribution[]
   clientIntention: ClientIntention[]
+  clientDistribution: ClientDistribution
   averageSurveyRating: string
   activationsByTime: ActivationByTime[]
   surveyQuestions: SurveyQuestion[]

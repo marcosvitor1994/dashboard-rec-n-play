@@ -14,6 +14,7 @@ import {
   processUsersPerDay,
   processAgeDistribution,
   processClientIntention,
+  processClientDistribution,
   calculateAverageSurveyRating,
   processActivationsByTimeWithFilters,
   processSurveyQuestions,
@@ -30,6 +31,8 @@ import ChartCard from "./components/dashboard/ChartCard"
 import FilterOffcanvas from "./components/dashboard/FilterOffcanvas"
 import SurveyQuestionsSection from "./components/dashboard/SurveyQuestionsSection"
 import CommentsCard from "./components/dashboard/CommentsCard"
+import ClientDistributionCard from "./components/dashboard/ClientDistributionCard"
+import EngagementFunnelChart from "./components/dashboard/EngagementFunnelChart"
 
 const API_BASE_URL = "https://api-rac-n-play.vercel.app/api/data/all"
 
@@ -45,6 +48,13 @@ export default function Dashboard() {
     usersPerDay: [],
     ageDistribution: [],
     clientIntention: [],
+    clientDistribution: {
+      totalResponses: 0,
+      clients: 0,
+      nonClients: 0,
+      clientsPercentage: 0,
+      nonClientsPercentage: 0,
+    },
     averageSurveyRating: "0",
     activationsByTime: [],
     surveyQuestions: [],
@@ -95,6 +105,7 @@ export default function Dashboard() {
 
         const surveyQuestions = processSurveyQuestions(surveys)
         const satisfactionBlocks = processSatisfactionBlocks(surveyQuestions)
+        const clientDistribution = processClientDistribution(surveys)
 
         const processedData: DashboardData = {
           totalUsers: getUniqueUsersWithActivations(checkinUserLinks),
@@ -105,6 +116,7 @@ export default function Dashboard() {
           usersPerDay: processUsersPerDay(users),
           ageDistribution: processAgeDistribution(surveys),
           clientIntention: processClientIntention(surveys),
+          clientDistribution,
           averageSurveyRating: calculateAverageSurveyRating(surveys),
           activationsByTime: processActivationsByTimeWithFilters(checkins, checkinActivationLinks),
           surveyQuestions,
@@ -283,6 +295,8 @@ export default function Dashboard() {
         {(selectedActivation || selectedDate) ? "Filtros Ativos" : "Filtrar"}
       </button>
 
+      
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
         {/* Check-ins por Dia - COM FILTRO - GRÁFICO DE BARRAS */}
         <ChartCard
@@ -377,19 +391,25 @@ export default function Dashboard() {
 
       {/* Seção de gráficos grandes - 2 colunas de 50% cada */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "2rem" }}>
-        {/* Usuários Cadastrados - SEM FILTRO - GRÁFICO DE BARRAS */}
+        {/* Funil de Engajamento - Usuários Cadastrados + Check-ins */}
         <div style={{ background: "white", borderRadius: "12px", padding: "1.5rem", boxShadow: "0 2px 8px rgba(0, 91, 169, 0.1)", border: "1px solid #E8F4F8" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#005CA9", marginBottom: "1rem" }}>Usuários Cadastrados por Dia</h2>
+          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#005CA9", marginBottom: "0.5rem" }}>Funil de Engajamento</h2>
+          <p style={{ fontSize: "0.875rem", color: "#718096", marginBottom: "1rem" }}>Comparação: Usuários Cadastrados vs Check-ins Realizados</p>
           <div style={{ height: "400px" }}>
-            <BarChartComponent
-              data={dashboardData.usersPerDay}
-              indexBy="date"
-              keys={["count"]}
-              colors={["#9B59B6"]}
-              labelTextColor="#ffffff"
+            <EngagementFunnelChart
+              data={dashboardData.checkinsPerDay.map(checkin => {
+                const userDay = dashboardData.usersPerDay.find(u => u.date === checkin.date)
+                return {
+                  date: checkin.date,
+                  users: userDay?.count || 0,
+                  checkins: checkin.count,
+                }
+              })}
             />
           </div>
         </div>
+
+
 
         {/* Picos de Horário - COM FILTRO DUPLO (Ativação + Data) - GRÁFICO DE LINHAS */}
         <ChartCard
@@ -408,6 +428,11 @@ export default function Dashboard() {
             yKey="count"
           />
         </ChartCard>
+      </div>
+
+      {/* Card de Distribuição de Clientes */}
+      <div style={{ marginBottom: "2rem" }}>
+        <ClientDistributionCard distribution={dashboardData.clientDistribution} />
       </div>
       
       <style>{`
