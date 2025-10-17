@@ -6,6 +6,7 @@ import type {
   ActivationByTime,
   UserPerDay,
   SurveyQuestion,
+  SatisfactionBlock,
 } from "../types/dashboard.types"
 
 export const processCheckinsPerDay = (checkins: any[], activationId?: number, checkinActivationLinks?: any[]): CheckinPerDay[] => {
@@ -264,13 +265,102 @@ export const processSurveyQuestions = (surveys: any[]): SurveyQuestion[] => {
   })
 
   return Object.entries(questionsMap)
-    .map(([pergunta, { total, count }]) => ({
-      pergunta,
-      media: count > 0 ? Number((total / count).toFixed(2)) : 0,
-      totalRespostas: count,
-    }))
+    .map(([pergunta, { total, count }]) => {
+      const media = count > 0 ? Number((total / count).toFixed(2)) : 0
+      const grau = ((media - 1) / 4) * 100
+      return {
+        pergunta,
+        media,
+        totalRespostas: count,
+        grau: Number(grau.toFixed(2)),
+      }
+    })
     .filter((item) => item.totalRespostas > 0)
     .filter((item) => !item.pergunta.toLowerCase().includes("idade"))
+}
+
+export const processSatisfactionBlocks = (questions: SurveyQuestion[]): SatisfactionBlock[] => {
+  const blocks: SatisfactionBlock[] = []
+
+  // Identificar perguntas por padrões
+  const q1 = questions.find(q =>
+    q.pergunta.toLowerCase().includes("interesse") ||
+    q.pergunta.toLowerCase().includes("assunto")
+  )
+  const q2 = questions.find(q =>
+    q.pergunta.toLowerCase().includes("relevante") ||
+    q.pergunta.toLowerCase().includes("relevância")
+  )
+  const q3 = questions.find(q =>
+    q.pergunta.toLowerCase().includes("experiência no espaço") ||
+    q.pergunta.toLowerCase().includes("experiencia no espaco")
+  )
+  const q4 = questions.find(q =>
+    q.pergunta.toLowerCase().includes("traços de personalidade") &&
+    q.pergunta.toLowerCase().includes("não cliente")
+  )
+  const q5 = questions.find(q =>
+    q.pergunta.toLowerCase().includes("traços de personalidade") &&
+    q.pergunta.toLowerCase().includes("cliente")
+  )
+  const q6 = questions.find(q =>
+    q.pergunta.toLowerCase().includes("vontade de se tornar cliente")
+  )
+  const q7 = questions.find(q =>
+    q.pergunta.toLowerCase().includes("ampliar") &&
+    q.pergunta.toLowerCase().includes("relacionamento")
+  )
+
+  // Bloco de Satisfação (Perguntas 1, 2 e 3)
+  if (q1 && q2 && q3) {
+    const satisfactionQuestions = [q1, q2, q3]
+    // Fórmula: (Grau 1 + Grau 2 + 3 × Grau 3) ÷ 5
+    const grade = (q1.grau + q2.grau + (3 * q3.grau)) / 5
+    const averageScore = (q1.media + q2.media + q3.media) / 3
+
+    blocks.push({
+      title: 'Bloco de Satisfação',
+      type: 'satisfaction',
+      questions: satisfactionQuestions,
+      averageScore: Number(averageScore.toFixed(2)),
+      grade: Number(grade.toFixed(2)),
+    })
+  }
+
+  // Bloco de Posicionamento (Perguntas 4 e 5)
+  if (q4 && q5) {
+    const positioningQuestions = [q4, q5]
+    // Fórmula: (Grau 4 + Grau 5) ÷ 2
+    const grade = (q4.grau + q5.grau) / 2
+    const averageScore = (q4.media + q5.media) / 2
+
+    blocks.push({
+      title: 'Bloco de Posicionamento',
+      type: 'positioning',
+      questions: positioningQuestions,
+      averageScore: Number(averageScore.toFixed(2)),
+      grade: Number(grade.toFixed(2)),
+    })
+  }
+
+  // Bloco de Intenção de Relacionamento (Perguntas 6 e 7)
+  if (q6 && q7) {
+    const relationshipQuestions = [q6, q7]
+    // Para este bloco, usamos a porcentagem de notas 4 e 5
+    // Como simplificação, vamos usar o grau médio das duas perguntas
+    const grade = (q6.grau + q7.grau) / 2
+    const averageScore = (q6.media + q7.media) / 2
+
+    blocks.push({
+      title: 'Bloco de Intenção de Relacionamento',
+      type: 'relationship',
+      questions: relationshipQuestions,
+      averageScore: Number(averageScore.toFixed(2)),
+      grade: Number(grade.toFixed(2)),
+    })
+  }
+
+  return blocks
 }
 
 export const processComments = (surveys: any[]): { id: number; comment: string; date: string; age?: string; isClient?: string }[] => {

@@ -1,66 +1,50 @@
-import type { SurveyQuestion } from "../../types/dashboard.types"
+import type { SatisfactionBlock } from "../../types/dashboard.types"
+import SatisfactionBlockCard from "./SatisfactionBlockCard"
 
 interface SurveyQuestionsSectionProps {
-  questions: SurveyQuestion[]
+  blocks: SatisfactionBlock[]
 }
 
-export default function SurveyQuestionsSection({ questions }: SurveyQuestionsSectionProps) {
+export default function SurveyQuestionsSection({ blocks }: SurveyQuestionsSectionProps) {
   return (
-    <div
-      style={{
-        gridColumn: "1 / -1",
-        background: "white",
-        borderRadius: "12px",
-        padding: "1.5rem",
-        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-      }}
-    >
+    <div style={{ marginTop: "2rem" }}>
       <h2
         style={{
-          fontSize: "1.125rem",
-          fontWeight: 600,
-          color: "#2d3748",
-          marginBottom: "1rem",
+          fontSize: "1.5rem",
+          fontWeight: 700,
+          color: "#005CA9",
+          marginBottom: "1.5rem",
         }}
       >
         Análise da Pesquisa de Satisfação
       </h2>
-      <div style={{ padding: "1rem" }}>
-        {questions.length > 0 ? (
-          <div style={{ display: "grid", gap: "1rem" }}>
-            {questions.map((question, index) => (
-              <div
-                key={index}
-                style={{
-                  padding: "1rem",
-                  background: "#f5f5f5",
-                  borderRadius: "8px",
-                  borderLeft: "4px solid #1976d2",
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: "0.5rem", color: "#333" }}>
-                  {question.pergunta}
-                </div>
-                <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
-                  <div>
-                    <span style={{ fontSize: "0.9rem", color: "#666" }}>Média: </span>
-                    <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "#1976d2" }}>
-                      {question.media.toFixed(2)}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "0.9rem", color: "#666" }}>
-                    Total de respostas: {question.totalRespostas}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ textAlign: "center", padding: "2rem", color: "#666" }}>
-            Nenhuma pergunta com respostas numéricas encontrada
-          </div>
-        )}
-      </div>
+
+      {blocks.length > 0 ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
+            gap: "1.5rem",
+          }}
+        >
+          {blocks.map((block, index) => (
+            <SatisfactionBlockCard key={index} block={block} />
+          ))}
+        </div>
+      ) : (
+        <div
+          style={{
+            background: "white",
+            borderRadius: "12px",
+            padding: "3rem",
+            textAlign: "center",
+            color: "#718096",
+            boxShadow: "0 2px 8px rgba(0, 91, 169, 0.1)",
+          }}
+        >
+          Nenhum bloco de satisfação disponível. Verifique se as perguntas da pesquisa foram respondidas.
+        </div>
+      )}
     </div>
   )
 }

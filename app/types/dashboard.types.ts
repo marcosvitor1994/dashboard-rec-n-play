@@ -34,6 +34,16 @@ export interface SurveyQuestion {
   pergunta: string
   media: number
   totalRespostas: number
+  grau: number // (média - 1) / 4 * 100
+}
+
+export interface SatisfactionBlock {
+  title: string
+  type: 'satisfaction' | 'positioning' | 'relationship'
+  questions: SurveyQuestion[]
+  averageScore: number // Nota média
+  grade: number // Grau (%)
+  variation?: number // Variação em relação a períodos anteriores (positivo/negativo)
 }
 
 export interface Comment {
@@ -61,6 +71,7 @@ export interface DashboardData {
   averageSurveyRating: string
   activationsByTime: ActivationByTime[]
   surveyQuestions: SurveyQuestion[]
+  satisfactionBlocks: SatisfactionBlock[]
   comments: Comment[]
   activations: Activation[]
   availableDates: string[]

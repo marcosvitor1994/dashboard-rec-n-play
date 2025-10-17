@@ -4,7 +4,8 @@
       "Bash(mv:*)",
       "Bash(rm:*)",
       "Bash(yarn build)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

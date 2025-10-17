@@ -76,11 +76,12 @@ export default function FilterOffcanvas({
       <div
         style={{
           position: "fixed",
-          top: 0,
-          right: isOpen ? 0 : "-400px",
-          width: "400px",
+          top: "20px",
+          right: isOpen ? "20px" : "-400px",
+          width: "350px",
           maxWidth: "90vw",
-          height: "100vh",
+          height: "auto",
+          borderRadius: "8px",
           backgroundColor: "white",
           boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.15)",
           zIndex: 1000,

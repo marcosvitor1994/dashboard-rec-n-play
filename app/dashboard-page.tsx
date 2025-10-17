@@ -17,6 +17,7 @@ import {
   calculateAverageSurveyRating,
   processActivationsByTimeWithFilters,
   processSurveyQuestions,
+  processSatisfactionBlocks,
   processComments,
   getAvailableDates,
   getPublishedData,
@@ -47,6 +48,7 @@ export default function Dashboard() {
     averageSurveyRating: "0",
     activationsByTime: [],
     surveyQuestions: [],
+    satisfactionBlocks: [],
     comments: [],
     activations: [],
     availableDates: [],
@@ -62,9 +64,8 @@ export default function Dashboard() {
 
   const [rawData, setRawData] = useState<any>(null)
 
-  // Estados para controlar os offcanvas de filtros
-  const [isActivationFilterOpen, setIsActivationFilterOpen] = useState(false)
-  const [isTimeFilterOpen, setIsTimeFilterOpen] = useState(false)
+  // Estado para controlar o offcanvas de filtro global
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,6 +93,9 @@ export default function Dashboard() {
           surveys,
         })
 
+        const surveyQuestions = processSurveyQuestions(surveys)
+        const satisfactionBlocks = processSatisfactionBlocks(surveyQuestions)
+
         const processedData: DashboardData = {
           totalUsers: getUniqueUsersWithActivations(checkinUserLinks),
           totalCheckins: checkins.length,
@@ -103,7 +107,8 @@ export default function Dashboard() {
           clientIntention: processClientIntention(surveys),
           averageSurveyRating: calculateAverageSurveyRating(surveys),
           activationsByTime: processActivationsByTimeWithFilters(checkins, checkinActivationLinks),
-          surveyQuestions: processSurveyQuestions(surveys),
+          surveyQuestions,
+          satisfactionBlocks,
           comments: processComments(surveys),
           activations: activations.map((a: any) => ({ id: a.id, nome: a.nome })),
           availableDates: getAvailableDates(checkins),
@@ -237,22 +242,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Offcanvas para filtro de ativações */}
+      {/* Filtro Global */}
       <FilterOffcanvas
-        isOpen={isActivationFilterOpen}
-        onClose={() => setIsActivationFilterOpen(false)}
-        title="Filtrar por Ativação"
-        showActivationFilter={true}
-        activations={dashboardData.activations}
-        selectedActivation={selectedActivation}
-        onActivationChange={setSelectedActivation}
-      />
-
-      {/* Offcanvas para filtro de horários (ativação + data) */}
-      <FilterOffcanvas
-        isOpen={isTimeFilterOpen}
-        onClose={() => setIsTimeFilterOpen(false)}
-        title="Filtrar Picos de Horário"
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        title="Filtros Globais"
         showActivationFilter={true}
         activations={dashboardData.activations}
         selectedActivation={selectedActivation}
@@ -263,13 +257,39 @@ export default function Dashboard() {
         onDateChange={setSelectedDate}
       />
 
+      {/* Botão para abrir o filtro global */}
+      <button
+        onClick={() => setIsFilterOpen(true)}
+        style={{
+          position: "fixed",
+          top: "20px",
+          right: "20px",
+          padding: "10px 20px",
+          backgroundColor: "#005CA9",
+          color: "white",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+          zIndex: 998,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          boxShadow: "0 2px 8px rgba(0, 91, 169, 0.2)",
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14.5 2H1.5L6.5 8.088V12.5L9.5 14V8.088L14.5 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        {(selectedActivation || selectedDate) ? "Filtros Ativos" : "Filtrar"}
+      </button>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
         {/* Check-ins por Dia - COM FILTRO - GRÁFICO DE BARRAS */}
         <ChartCard
           title="Check-ins por Dia"
           subtitle={selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome : undefined}
-          onFilterClick={() => setIsActivationFilterOpen(true)}
-          hasActiveFilter={!!selectedActivation}
+          onFilterClick={() => setIsFilterOpen(true)}
+          hasActiveFilter={!!(selectedActivation || selectedDate)}
         >
           <BarChartComponent
             data={filteredCheckinsPerDay}
@@ -379,7 +399,7 @@ export default function Dashboard() {
               ? `${selectedActivation ? dashboardData.activations.find(a => a.id === selectedActivation)?.nome || '' : ''}${selectedActivation && selectedDate ? ' - ' : ''}${selectedDate || ''}${!selectedDate && !selectedActivation ? '' : ''}`
               : "(Média de todos os dias)"
           }
-          onFilterClick={() => setIsTimeFilterOpen(true)}
+          onFilterClick={() => setIsFilterOpen(true)}
           hasActiveFilter={!!(selectedActivation || selectedDate)}
         >
           <LineChartComponent
@@ -397,7 +417,7 @@ export default function Dashboard() {
         }
       `}</style>
 
-      <SurveyQuestionsSection questions={dashboardData.surveyQuestions} />
+      <SurveyQuestionsSection blocks={dashboardData.satisfactionBlocks} />
 
       {/* Card de Comentários */}
       <div style={{ marginTop: "2rem" }}>
